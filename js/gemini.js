@@ -220,24 +220,23 @@ const GEMINI = {
 
     const redirectUri   = window.location.href.split("?")[0].replace(/#.*$/, "");
 
-    const body = new URLSearchParams({
-      grant_type:    "authorization_code",
-      client_id:     clientId,
-      redirect_uri:  redirectUri,
-      code,
-      ...(clientSecret ? { client_secret: clientSecret } : {}),
-      ...(verifier    ? { code_verifier:  verifier     } : {}),
-    });
-
+    // Token exchange via server-side proxy to avoid CORS (Zoho blocks browser requests)
     let res;
     try {
-      res = await fetch(`${this.zohoAuthBase}/oauth/v2/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: body.toString()
+      res = await fetch("/api/zoho-token", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          client_id:     clientId,
+          client_secret: clientSecret || undefined,
+          code_verifier: verifier     || undefined,
+          redirect_uri:  redirectUri,
+          region,
+        }),
       });
     } catch (e) {
-      throw new Error("Cannot reach Zoho auth server.");
+      throw new Error("Cannot reach token proxy.");
     }
 
     const data = await res.json();
