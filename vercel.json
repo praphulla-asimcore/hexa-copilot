@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/zoho-token.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}
