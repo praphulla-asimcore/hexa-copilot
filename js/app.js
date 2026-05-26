@@ -32,8 +32,17 @@ function getConfig() {
   return JSON.parse(localStorage.getItem("hx_config") || "null");
 }
 
-function saveConfig(openaiKey, zohoToken, zohoRegion) {
-  localStorage.setItem("hx_config", JSON.stringify({ openaiKey, zohoToken, zohoRegion }));
+function saveConfig(openaiKey, zohoToken, zohoRegion, zohoRefreshToken, zohoClientId, zohoClientSecret) {
+  const existing = getConfig() || {};
+  localStorage.setItem("hx_config", JSON.stringify({
+    ...existing,
+    openaiKey,
+    zohoToken,
+    zohoRegion,
+    ...(zohoRefreshToken  ? { zohoRefreshToken  } : {}),
+    ...(zohoClientId      ? { zohoClientId      } : {}),
+    ...(zohoClientSecret  ? { zohoClientSecret  } : {}),
+  }));
 }
 
 // ── PAGE BOOT ─────────────────────────────────────────────────────────
@@ -262,12 +271,16 @@ async function _handleOAuthCallback() {
   sessionStorage.removeItem("zoho_pending_openai");
 
   try {
-    const token  = await GEMINI.exchangeCodeForToken(code);
-    const region = sessionStorage.getItem("zoho_region") || "com";
+    const { accessToken, refreshToken } = await GEMINI.exchangeCodeForToken(code);
+    const region      = sessionStorage.getItem("zoho_region")        || "com";
+    const clientId    = sessionStorage.getItem("zoho_client_id")     || "";
+    const clientSecret= sessionStorage.getItem("zoho_client_secret") || "";
     sessionStorage.removeItem("zoho_region");
+    sessionStorage.removeItem("zoho_client_id");
+    sessionStorage.removeItem("zoho_client_secret");
 
-    // Auto-save so _postLogin → _autoConnect launches the app directly
-    saveConfig(savedOpenAI, token, region);
+    // Save access token + refresh token so we can auto-renew without re-auth
+    saveConfig(savedOpenAI, accessToken, region, refreshToken, clientId, clientSecret);
   } catch (err) {
     // Persist error so _postLogin can display it in the settings modal
     sessionStorage.setItem("zoho_oauth_error", err.message);

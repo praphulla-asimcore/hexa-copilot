@@ -57,21 +57,39 @@ const GEMINI = {
     return data.organizations || [];
   },
 
+  // ── PAGINATE THROUGH ALL PAGES OF A LIST ENDPOINT ──────────────────
+  async _zohoGetAll(path, params = {}, maxPages = 10) {
+    const keyMap = {
+      invoices: "invoices", bills: "bills", expenses: "expenses",
+      customerpayments: "customerpayments", vendorpayments: "vendorpayments",
+      contacts: "contacts", items: "items", bankaccounts: "bankaccounts",
+      salesorders: "salesorders", purchaseorders: "purchaseorders",
+      estimates: "estimates", journals: "journals",
+    };
+    const rootKey = keyMap[path] || path;
+    const all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const data = await this._zohoGet(path, { ...params, page, per_page: 200 });
+      const items = data[rootKey] || [];
+      all.push(...items);
+      if (!data.page_context?.has_more_page) break;
+    }
+    return all;
+  },
+
   // ── FETCH ORG SNAPSHOT (AR, AP, Cash) ──────────────────────────────
   async fetchOrgSnapshot(orgId) {
     const today = new Date();
-
     const [invRes, billRes, bankRes] = await Promise.allSettled([
-      this._zohoGet("invoices",    { organization_id: orgId, status: "unpaid",        per_page: 200 }),
-      this._zohoGet("bills",       { organization_id: orgId, status: "unpaid",        per_page: 200 }),
-      this._zohoGet("bankaccounts",{ organization_id: orgId, filter_by: "Status.Active" }),
+      this._zohoGet("invoices",     { organization_id: orgId, status: "unpaid", per_page: 200 }),
+      this._zohoGet("bills",        { organization_id: orgId, status: "unpaid", per_page: 200 }),
+      this._zohoGet("bankaccounts", { organization_id: orgId, filter_by: "Status.Active" }),
     ]);
 
     let arTotal = 0, arCount = 0, arOverdue = 0;
     if (invRes.status === "fulfilled") {
       (invRes.value.invoices || []).forEach(i => {
-        arTotal += (i.balance || 0);
-        arCount++;
+        arTotal += (i.balance || 0); arCount++;
         if (new Date(i.due_date) < today) arOverdue++;
       });
     }
@@ -79,8 +97,7 @@ const GEMINI = {
     let apTotal = 0, apCount = 0, apOverdue = 0;
     if (billRes.status === "fulfilled") {
       (billRes.value.bills || []).forEach(b => {
-        apTotal += (b.balance || 0);
-        apCount++;
+        apTotal += (b.balance || 0); apCount++;
         if (new Date(b.due_date) < today) apOverdue++;
       });
     }
@@ -93,88 +110,58 @@ const GEMINI = {
     return { arTotal, arCount, arOverdue, apTotal, apCount, apOverdue, cashTotal };
   },
 
-  // ── FETCH MODULE VIEW DATA ──────────────────────────────────────────
+  // ── FETCH MODULE VIEW DATA (full paginated history) ─────────────────
   async fetchModuleData(view, orgId) {
-    const p = { organization_id: orgId, per_page: 100 };
+    const p = { organization_id: orgId, sort_column: "date", sort_order: "D" };
     switch (view) {
-      case "invoices":  return this._zohoGet("invoices",         { ...p, status: "unpaid", sort_column: "due_date", sort_order: "A" });
-      case "payments":  return this._zohoGet("customerpayments", { ...p, sort_column: "date", sort_order: "D" });
-      case "expenses":  return this._zohoGet("expenses",         { ...p, sort_column: "date", sort_order: "D" });
-      case "ap":        return this._zohoGet("bills",            { ...p, status: "unpaid", sort_column: "due_date", sort_order: "A" });
-      default:          return null;
+      case "invoices": {
+        const rows = await this._zohoGetAll("invoices", { ...p, status: "unpaid", sort_column: "due_date", sort_order: "A" });
+        return { invoices: rows };
+      }
+      case "payments": {
+        const rows = await this._zohoGetAll("customerpayments", p);
+        return { customerpayments: rows };
+      }
+      case "expenses": {
+        const rows = await this._zohoGetAll("expenses", p);
+        return { expenses: rows };
+      }
+      case "ap": {
+        const rows = await this._zohoGetAll("bills", { ...p, status: "unpaid", sort_column: "due_date", sort_order: "A" });
+        return { bills: rows };
+      }
+      default: return null;
     }
   },
 
-  // ── MAIN AI QUERY ───────────────────────────────────────────────────
+  // ── MAIN AI QUERY (via /api/ai-query — server-side Zoho fetch + OpenAI) ─
   async query(userMessage, org) {
     if (!this.openaiKey) throw new Error("No OpenAI API key configured.");
 
-    const systemPrompt = PROMPTS.forQuery(org, userMessage);
-    const zohoData     = await this._fetchContextForQuery(userMessage, org);
-
-    const userContent = [
-      `Organisation: ${org.name} (${org.short}) | ${org.country} | Currency: ${org.currency} (${org.currencySymbol})`,
-      zohoData ? `\nLIVE ZOHO BOOKS DATA (use this as the source of truth for all figures):\n${zohoData}` : "\n(No Zoho data fetched — answer based on context and ask user to check permissions if needed.)",
-      `\nUser Query: ${userMessage}`
-    ].join("");
+    const orgContext = `Organisation: ${org.name} (${org.short}) | ${org.country} | Currency: ${org.currency} (${org.currencySymbol})`;
 
     let res;
     try {
-      res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type":  "application/json",
-          "Authorization": `Bearer ${this.openaiKey}`
-        },
+      res = await fetch("/api/ai-query", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model:           "gpt-4o",
-          response_format: { type: "json_object" },
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user",   content: userContent  }
-          ],
-          max_tokens:  2000,
-          temperature: 0.2
-        })
+          openaiKey:    this.openaiKey,
+          zohoToken:    this.zohoToken  || null,
+          zohoRegion:   this.zohoRegion || "com",
+          orgId:        org.zohoOrgId   || null,
+          systemPrompt: PROMPTS.forQuery(org, userMessage),
+          userMessage,
+          orgContext,
+        }),
       });
     } catch (e) {
-      throw new Error("Cannot reach OpenAI API. Check your network connection.");
-    }
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `OpenAI error ${res.status}`);
+      throw new Error("Cannot reach AI query proxy: " + e.message);
     }
 
     const data = await res.json();
-    return this._parseResponse(data.choices?.[0]?.message?.content || "");
-  },
-
-  // ── FETCH ZOHO CONTEXT FOR QUERY ────────────────────────────────────
-  async _fetchContextForQuery(query, org) {
-    if (!this.zohoToken || !org.zohoOrgId) return null;
-
-    const q = query.toLowerCase();
-    let endpoint, params = { organization_id: org.zohoOrgId, per_page: 100 };
-
-    if      (/invoice|ar\b|receivable|aging/.test(q))       { endpoint = "invoices";         params.status = "unpaid"; }
-    else if (/payment|receipt|collect/.test(q))              { endpoint = "customerpayments"; }
-    else if (/expense|cost|spend/.test(q))                   { endpoint = "expenses"; }
-    else if (/\bap\b|payable|vendor|bill/.test(q))           { endpoint = "bills";            params.status = "unpaid"; }
-    else if (/p&l|profit|loss|revenue|report|ebitda/.test(q)){ endpoint = "invoices"; }
-    else if (/cash|bank/.test(q))                            { endpoint = "bankaccounts";     params = { organization_id: org.zohoOrgId, filter_by: "Status.Active" }; }
-    else if (/tax|gst|vat|tds|ssf|bpjs|cpf|compliance/.test(q))   { endpoint = "invoices"; }
-    else if (/intercompany|related.party|elimination/.test(q))     { endpoint = "contacts";   params.contact_type = "customer"; }
-
-    if (!endpoint) return null;
-
-    try {
-      const data = await this._zohoGet(endpoint, params);
-      return JSON.stringify(data, null, 2).substring(0, 10000);
-    } catch (err) {
-      console.warn("Zoho context fetch failed:", err.message);
-      return null;
-    }
+    if (!res.ok || data.error) throw new Error(data.error || `AI error ${res.status}`);
+    return this._parseResponse(data.content || "");
   },
 
   // ── PARSE OPENAI RESPONSE ───────────────────────────────────────────
@@ -209,7 +196,7 @@ const GEMINI = {
     authUrl.searchParams.set("response_type",         "code");
     authUrl.searchParams.set("redirect_uri",          redirectUri);
     authUrl.searchParams.set("scope",                 "ZohoBooks.fullaccess.all");
-    authUrl.searchParams.set("access_type",           "online");
+    authUrl.searchParams.set("access_type",           "offline");
     authUrl.searchParams.set("code_challenge",        challenge);
     authUrl.searchParams.set("code_challenge_method", "S256");
 
@@ -249,10 +236,35 @@ const GEMINI = {
     if (!data.access_token) throw new Error("No access token returned from Zoho.");
 
     sessionStorage.removeItem("zoho_pkce_verifier");
-    sessionStorage.removeItem("zoho_client_id");
-    sessionStorage.removeItem("zoho_client_secret");
 
-    return data.access_token;
+    // Return both tokens — refresh_token persists forever (offline access)
+    return { accessToken: data.access_token, refreshToken: data.refresh_token || null };
+  },
+
+  async refreshAccessToken() {
+    const config = JSON.parse(localStorage.getItem("hx_config") || "null");
+    if (!config?.zohoRefreshToken || !config?.zohoClientId) return null;
+    try {
+      const res = await fetch("/api/zoho-token", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          grant_type:    "refresh_token",
+          client_id:     config.zohoClientId,
+          client_secret: config.zohoClientSecret || undefined,
+          refresh_token: config.zohoRefreshToken,
+          region:        config.zohoRegion || "com",
+        }),
+      });
+      const data = await res.json();
+      if (data.access_token) {
+        this.zohoToken = data.access_token;
+        const updated = { ...config, zohoToken: data.access_token };
+        localStorage.setItem("hx_config", JSON.stringify(updated));
+        return data.access_token;
+      }
+    } catch (_) {}
+    return null;
   },
 
   async _generatePKCE() {
