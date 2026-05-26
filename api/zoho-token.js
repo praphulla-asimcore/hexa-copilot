@@ -1,6 +1,8 @@
 // Vercel serverless function — proxies Zoho OAuth token operations to avoid CORS.
 // Handles: authorization_code exchange and refresh_token renewal.
 
+module.exports.config = { maxDuration: 30 };
+
 const ZOHO_AUTH_BASES = {
   com: "https://accounts.zoho.com",
   eu:  "https://accounts.zoho.eu",
@@ -51,8 +53,12 @@ module.exports = async function handler(req, res) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body:    body.toString(),
     });
-    const data = await zohoRes.json();
-    return res.status(zohoRes.status).json(data);
+    const text = await zohoRes.text();
+    try {
+      return res.status(zohoRes.status).json(JSON.parse(text));
+    } catch (_) {
+      return res.status(502).json({ error: "Zoho returned non-JSON: " + text.substring(0, 300) });
+    }
   } catch (err) {
     return res.status(502).json({ error: "Failed to reach Zoho: " + err.message });
   }

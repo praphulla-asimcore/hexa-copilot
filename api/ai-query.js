@@ -1,5 +1,7 @@
-// Vercel serverless function — proxies OpenAI + Zoho data fetch server-side.
-// Avoids browser socket timeouts on long AI responses and CORS on Zoho API.
+// Vercel serverless function — fetches Zoho context + calls OpenAI server-side.
+// maxDuration: 60 overrides the 10s default to prevent socket timeouts.
+
+module.exports.config = { maxDuration: 60 };
 
 const ZOHO_API_BASES = {
   com: "https://www.zohoapis.com",
@@ -14,15 +16,17 @@ async function zohoGet(token, region, path, params = {}) {
   const base = ZOHO_API_BASES[region] || ZOHO_API_BASES.com;
   const url  = new URL(`${base}/books/v3/${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const r = await fetch(url.toString(), {
+  const r    = await fetch(url.toString(), {
     headers: { "Authorization": `Zoho-oauthtoken ${token}` },
   });
-  return r.json();
+  const text = await r.text();
+  try { return JSON.parse(text); } catch (_) { return {}; }
 }
 
-async function zohoGetAll(token, region, path, params = {}, rootKey, maxPages = 8) {
+async function zohoGetPaged(token, region, path, params, rootKey) {
+  // Fetch up to 2 pages (400 records max) — keeps function under timeout
   const all = [];
-  for (let page = 1; page <= maxPages; page++) {
+  for (let page = 1; page <= 2; page++) {
     const data = await zohoGet(token, region, path, { ...params, page, per_page: 200 });
     const items = data[rootKey] || [];
     all.push(...items);
@@ -32,104 +36,84 @@ async function zohoGetAll(token, region, path, params = {}, rootKey, maxPages = 
 }
 
 async function fetchZohoContext(token, region, orgId, query) {
-  const q     = query.toLowerCase();
-  const today = new Date().toISOString().split("T")[0];
-  const from5 = new Date(); from5.setFullYear(from5.getFullYear() - 5);
+  const q       = query.toLowerCase();
+  const today   = new Date().toISOString().split("T")[0];
+  const from5   = new Date(); from5.setFullYear(from5.getFullYear() - 5);
   const fromDate = from5.toISOString().split("T")[0];
-  const rp    = { organization_id: orgId };
+  const rp      = { organization_id: orgId };
 
+  // Pick at most 3 most relevant data sources to stay well within timeout
   const tasks = [];
 
-  // Financial statements — use Zoho's built-in report endpoints
-  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover/.test(q)) {
-    tasks.push(["reports/profitandloss", { ...rp, from_date: fromDate, to_date: today, cash_based: false }, "profitandloss", false]);
-  }
-  if (/balance.?sheet|asset|liabilit|equity|net.worth/.test(q)) {
-    tasks.push(["reports/balancesheet", { ...rp, date: today }, "balancesheet", false]);
-  }
-  if (/cash.?flow|free.cash|operating.cash|cfo|cfi|cff/.test(q)) {
-    tasks.push(["reports/cashflow", { ...rp, from_date: fromDate, to_date: today }, "cashflow", false]);
-  }
-  if (/trial.?balance/.test(q)) {
-    tasks.push(["reports/trialbalance", { ...rp, from_date: fromDate, to_date: today }, "trialbalance", false]);
-  }
+  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover/.test(q))
+    tasks.push(() => zohoGet(token, region, "reports/profitandloss",
+      { ...rp, from_date: fromDate, to_date: today, cash_based: false }).then(d => ({ profitandloss: d })));
 
-  // Transaction lists — paginated full history
-  if (/invoice|ar\b|receivable|aging|collect|outstanding/.test(q)) {
-    tasks.push(["invoices", { ...rp, sort_column: "date", sort_order: "D" }, "invoices", true]);
-  }
-  if (/\bap\b|payable|vendor bill|bill/.test(q)) {
-    tasks.push(["bills", { ...rp, sort_column: "date", sort_order: "D" }, "bills", true]);
-  }
-  if (/customer.?payment|receipt|money.received/.test(q)) {
-    tasks.push(["customerpayments", { ...rp, sort_column: "date", sort_order: "D" }, "customerpayments", true]);
-  }
-  if (/vendor.?payment|paid.to|payment.made/.test(q)) {
-    tasks.push(["vendorpayments", { ...rp, sort_column: "date", sort_order: "D" }, "vendorpayments", true]);
-  }
-  if (/expense|cost|spend|overhead/.test(q)) {
-    tasks.push(["expenses", { ...rp, sort_column: "date", sort_order: "D" }, "expenses", true]);
-  }
-  if (/cash|bank.balance|bank.account/.test(q)) {
-    tasks.push(["bankaccounts", { ...rp, filter_by: "Status.Active" }, "bankaccounts", false]);
-  }
-  if (/contact|customer list|client list|vendor list/.test(q)) {
-    tasks.push(["contacts", { ...rp, sort_column: "contact_name", sort_order: "A" }, "contacts", true]);
-  }
-  if (/item|product|service|catalog|price/.test(q)) {
-    tasks.push(["items", { ...rp, sort_column: "name", sort_order: "A" }, "items", true]);
-  }
-  if (/sales.?order/.test(q)) {
-    tasks.push(["salesorders", { ...rp, sort_column: "date", sort_order: "D" }, "salesorders", true]);
-  }
-  if (/purchase.?order|po\b/.test(q)) {
-    tasks.push(["purchaseorders", { ...rp, sort_column: "date", sort_order: "D" }, "purchaseorders", true]);
-  }
-  if (/estimate|quote|proposal/.test(q)) {
-    tasks.push(["estimates", { ...rp, sort_column: "date", sort_order: "D" }, "estimates", true]);
-  }
-  if (/tax|gst|vat|tds|sst|withholding|compliance|filing/.test(q)) {
-    tasks.push(["invoices", { ...rp, sort_column: "date", sort_order: "D" }, "invoices", true]);
-    tasks.push(["reports/taxsummary", { ...rp, from_date: fromDate, to_date: today }, "taxsummary", false]);
-  }
-  if (/intercompany|related.party|elimination|consolidat/.test(q)) {
-    tasks.push(["contacts", { ...rp, contact_type: "customer" }, "contacts", true]);
-    tasks.push(["invoices", { ...rp, sort_column: "date", sort_order: "D" }, "invoices", true]);
-  }
-  if (/journal|manual.entry|adjustment/.test(q)) {
-    tasks.push(["journals", { ...rp, sort_column: "date", sort_order: "D" }, "journals", true]);
-  }
-  if (/chart.of.accounts|coa|account.list/.test(q)) {
-    tasks.push(["chartofaccounts", { ...rp }, "chartofaccounts", false]);
-  }
+  if (/balance.?sheet|asset|liabilit|equity|net.worth/.test(q))
+    tasks.push(() => zohoGet(token, region, "reports/balancesheet",
+      { ...rp, date: today }).then(d => ({ balancesheet: d })));
 
-  // Broad/general — fetch snapshot summary
+  if (/cash.?flow|free.cash|operating.cash/.test(q))
+    tasks.push(() => zohoGet(token, region, "reports/cashflow",
+      { ...rp, from_date: fromDate, to_date: today }).then(d => ({ cashflow: d })));
+
+  if (/trial.?balance/.test(q))
+    tasks.push(() => zohoGet(token, region, "reports/trialbalance",
+      { ...rp, from_date: fromDate, to_date: today }).then(d => ({ trialbalance: d })));
+
+  if (/invoice|ar\b|receivable|aging|collect|outstanding/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "invoices",
+      { ...rp, sort_column: "date", sort_order: "D" }, "invoices").then(r => ({ invoices: r })));
+
+  if (/\bap\b|payable|vendor.?bill|\bbill\b/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "bills",
+      { ...rp, sort_column: "date", sort_order: "D" }, "bills").then(r => ({ bills: r })));
+
+  if (/payment|receipt|money.received/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "customerpayments",
+      { ...rp, sort_column: "date", sort_order: "D" }, "customerpayments").then(r => ({ customerpayments: r })));
+
+  if (/expense|cost|spend|overhead/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "expenses",
+      { ...rp, sort_column: "date", sort_order: "D" }, "expenses").then(r => ({ expenses: r })));
+
+  if (/cash|bank.balance|bank.account/.test(q))
+    tasks.push(() => zohoGet(token, region, "bankaccounts",
+      { ...rp, filter_by: "Status.Active" }).then(d => ({ bankaccounts: d })));
+
+  if (/contact|customer.list|vendor.list/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "contacts",
+      { ...rp, sort_column: "contact_name", sort_order: "A" }, "contacts").then(r => ({ contacts: r })));
+
+  if (/tax|gst|vat|tds|sst|withholding|compliance|filing/.test(q))
+    tasks.push(() => zohoGet(token, region, "reports/taxsummary",
+      { ...rp, from_date: fromDate, to_date: today }).then(d => ({ taxsummary: d })));
+
+  if (/sales.?order/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "salesorders",
+      { ...rp, sort_column: "date", sort_order: "D" }, "salesorders").then(r => ({ salesorders: r })));
+
+  if (/purchase.?order|\bpo\b/.test(q))
+    tasks.push(() => zohoGetPaged(token, region, "purchaseorders",
+      { ...rp, sort_column: "date", sort_order: "D" }, "purchaseorders").then(r => ({ purchaseorders: r })));
+
+  // Fallback: unpaid invoices + bills + bank balances
   if (!tasks.length) {
     tasks.push(
-      ["invoices",     { ...rp, status: "unpaid",  per_page: 200 }, "invoices",     false],
-      ["bills",        { ...rp, status: "unpaid",  per_page: 200 }, "bills",        false],
-      ["bankaccounts", { ...rp, filter_by: "Status.Active" },       "bankaccounts", false],
-      ["expenses",     { ...rp, per_page: 100, sort_column: "date", sort_order: "D" }, "expenses", false],
+      () => zohoGet(token, region, "invoices",     { ...rp, status: "unpaid", per_page: 200 }).then(d => ({ invoices: d })),
+      () => zohoGet(token, region, "bills",        { ...rp, status: "unpaid", per_page: 200 }).then(d => ({ bills: d })),
+      () => zohoGet(token, region, "bankaccounts", { ...rp, filter_by: "Status.Active" }).then(d => ({ bankaccounts: d })),
     );
   }
 
-  const results = await Promise.allSettled(
-    tasks.map(([path, params, rootKey, paginate]) =>
-      paginate
-        ? zohoGetAll(token, region, path, params, rootKey).then(items => ({ [rootKey]: items }))
-        : zohoGet(token, region, path, params)
-    )
-  );
-
+  // Run at most 3 tasks in parallel to stay within timeout
+  const limited  = tasks.slice(0, 3);
+  const results  = await Promise.allSettled(limited.map(fn => fn()));
   const combined = {};
-  tasks.forEach(([, , rootKey], i) => {
-    if (results[i].status === "fulfilled") {
-      Object.assign(combined, results[i].value);
-    }
-  });
+  results.forEach(r => { if (r.status === "fulfilled") Object.assign(combined, r.value); });
 
   const json = JSON.stringify(combined, null, 2);
-  return json.length > 80000 ? json.substring(0, 80000) + "\n... [truncated]" : json;
+  return json.length > 60000 ? json.substring(0, 60000) + "\n...[truncated]" : json;
 }
 
 module.exports = async function handler(req, res) {
@@ -141,36 +125,27 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST")   return res.status(405).json({ error: "Method not allowed" });
 
   const { openaiKey, zohoToken, zohoRegion, orgId, systemPrompt, userMessage, orgContext } = req.body;
-
-  if (!openaiKey || !systemPrompt || !userMessage) {
+  if (!openaiKey || !systemPrompt || !userMessage)
     return res.status(400).json({ error: "Missing required fields." });
-  }
 
-  // Fetch Zoho context server-side (no CORS issue here)
   let zohoData = null;
   if (zohoToken && orgId) {
-    try {
-      zohoData = await fetchZohoContext(zohoToken, zohoRegion || "com", orgId, userMessage);
-    } catch (e) {
-      console.error("Zoho context fetch error:", e.message);
-    }
+    try { zohoData = await fetchZohoContext(zohoToken, zohoRegion || "com", orgId, userMessage); }
+    catch (e) { console.error("Zoho fetch error:", e.message); }
   }
 
   const userContent = [
     orgContext || "",
     zohoData
-      ? `\nLIVE ZOHO BOOKS DATA — use as source of truth for all figures:\n${zohoData}`
+      ? `\nLIVE ZOHO BOOKS DATA — use as source of truth:\n${zohoData}`
       : "\n(Zoho data unavailable — answer from context.)",
-    `\nUser Query: ${userMessage}`
+    `\nUser Query: ${userMessage}`,
   ].join("");
 
   try {
     const aiRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${openaiKey}`,
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
       body: JSON.stringify({
         model:           "gpt-4o",
         response_format: { type: "json_object" },
