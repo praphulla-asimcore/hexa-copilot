@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hexa CoPilot — Finance Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Animated background -->
+<div id="bg-hex"></div>
+<div id="bg-glow"></div>
+<canvas id="bg-particles"></canvas>
+
+<!-- Setup Modal -->
+<div id="apiModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-logo">
+      <img src="assets/hexa-logo.png" alt="Hexa" class="modal-logo-img">
+      <div class="modal-title">Hexa CoPilot</div>
+      <div class="modal-sub">Finance Intelligence · OpenAI GPT-4o + Zoho Books</div>
+    </div>
+    <div class="modal-desc">Connect your API keys to activate live financial intelligence across all your Zoho Books organisations.</div>
+
+    <!-- OpenAI Key -->
+    <div class="form-group">
+      <label>OpenAI API Key <span class="required">*</span></label>
+      <input type="password" id="openaiKey" placeholder="sk-proj-..." autocomplete="off">
+      <div class="field-hint">Powers the AI engine via GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7AB2F7">platform.openai.com/api-keys</a></div>
+    </div>
+
+    <!-- Zoho Region -->
+    <div class="form-group">
+      <label>Zoho Data Centre</label>
+      <select id="zohoRegion">
+        <option value="com">Global · zohoapis.com</option>
+        <option value="eu">Europe · zohoapis.eu</option>
+        <option value="in">India · zohoapis.in</option>
+        <option value="au">Australia · zohoapis.com.au</option>
+        <option value="jp">Japan · zohoapis.jp</option>
+        <option value="ca">Canada · zohoapis.ca</option>
+      </select>
+    </div>
+
+    <!-- Zoho Connection Tabs -->
+    <div class="form-divider"><span>Zoho Books Connection</span></div>
+    <div class="form-tabs">
+      <button class="tab-btn active" onclick="switchModalTab('token', this)">Access Token</button>
+      <button class="tab-btn" onclick="switchModalTab('oauth', this)">OAuth (Client ID)</button>
+    </div>
+
+    <!-- Tab: Access Token -->
+    <div id="tab-token">
+      <div class="form-group" style="margin-top:14px">
+        <label>Zoho Access Token <span class="required">*</span></label>
+        <input type="password" id="zohoToken" placeholder="1000.xxxxxxxxxxxxxxxx..." autocomplete="off">
+        <div class="field-hint">
+          Generate at <a href="https://api-console.zoho.com" target="_blank" style="color:#7AB2F7">api-console.zoho.com</a>
+          → Self Client → Scope: <code style="color:#C084FC">ZohoBooks.fullaccess.all</code>
+        </div>
+      </div>
+      <button class="btn-connect" id="connectBtn" onclick="connectAPIs()">Connect &amp; Launch →</button>
+    </div>
+
+    <!-- Tab: OAuth -->
+    <div id="tab-oauth" style="display:none">
+      <div class="form-group" style="margin-top:14px">
+        <label>Zoho Client ID</label>
+        <input type="text" id="zohoClientId" placeholder="1000.XXXXXXXXXXXXXXXXXX" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Zoho Client Secret <span class="optional">(if required)</span></label>
+        <input type="password" id="zohoClientSecret" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+        <div class="field-hint">
+          Register a Web-based app at <a href="https://api-console.zoho.com" target="_blank" style="color:#7AB2F7">api-console.zoho.com</a> · Redirect URI: <span id="currentUrl" style="color:#C084FC;font-size:10px"></span>
+        </div>
+      </div>
+      <div id="oauthStatus" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
+      <button class="btn-connect" onclick="startOAuthFlow()">Authorize with Zoho →</button>
+    </div>
+
+    <div class="modal-footer">Keys are stored in your browser session only. Never transmitted or logged externally.</div>
+  </div>
+</div>
+
+<!-- Main App Layout -->
+<div id="app" class="hidden">
+
+  <!-- TOPBAR -->
+  <header id="topbar">
+    <div class="tb-left">
+      <img src="assets/hexa-logo.png" alt="Hexa" class="tb-logo-img">
+      <div class="tb-brand-text">
+        <span class="tb-name">CoPilot</span>
+        <span class="tb-tag">Finance Intelligence</span>
+      </div>
+    </div>
+
+    <div class="tb-center">
+      <div class="live-indicator">
+        <span class="live-dot" id="liveDot"></span>
+        <span id="liveText">Connecting…</span>
+      </div>
+    </div>
+
+    <div class="tb-right">
+      <div class="pill pill-gemini">
+        <span class="pill-dot blue"></span>
+        OpenAI GPT-4o
+      </div>
+      <div class="pill pill-zoho" id="zohoPill">
+        <span class="pill-dot orange"></span>
+        Zoho Books
+      </div>
+      <div class="user-avatar" title="Head of Finance — APAC" onclick="showSettings()">AS
+        <span class="avatar-status"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="app-body">
+
+    <!-- LEFT SIDEBAR -->
+    <aside id="sideL">
+
+      <!-- Org Selector -->
+      <div class="sl-section-label">Active Organisation</div>
+      <div class="org-select-wrap">
+        <select id="orgSelect" onchange="APP.switchOrg(this.value)"></select>
+        <span class="select-arrow">▾</span>
+      </div>
+
+      <!-- Org Card -->
+      <div class="org-card" id="orgCard">
+        <div class="org-flag" id="orgFlag">🇸🇬</div>
+        <div class="org-name" id="orgName">Hexamatics SPL</div>
+        <div class="org-detail" id="orgDetail">Singapore · EOR & Staffing · FY2025</div>
+        <div class="org-divider"></div>
+        <div class="org-tags" id="orgTags"></div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="sl-section-label">Navigation</div>
+      <nav id="mainNav">
+        <div class="nav-item active" data-view="chat" onclick="APP.switchView('chat', this)">
+          <span class="nav-icon">💬</span> AI Chat
+        </div>
+        <div class="nav-item" data-view="invoices" onclick="APP.switchView('invoices', this)">
+          <span class="nav-icon">🧾</span> Invoices
+          <span class="nav-badge" id="badge-invoices"></span>
+        </div>
+        <div class="nav-item" data-view="payments" onclick="APP.switchView('payments', this)">
+          <span class="nav-icon">💳</span> Payments
+        </div>
+        <div class="nav-item" data-view="expenses" onclick="APP.switchView('expenses', this)">
+          <span class="nav-icon">📋</span> Expenses
+        </div>
+        <div class="nav-item" data-view="ap" onclick="APP.switchView('ap', this)">
+          <span class="nav-icon">📤</span> AP / Bills
+          <span class="nav-badge red" id="badge-ap"></span>
+        </div>
+        <div class="nav-item" data-view="reports" onclick="APP.switchView('reports', this)">
+          <span class="nav-icon">📊</span> Reports
+        </div>
+        <div class="nav-item" data-view="intercompany" onclick="APP.switchView('intercompany', this)">
+          <span class="nav-icon">🔗</span> Intercompany
+        </div>
+        <div class="nav-item" data-view="tax" onclick="APP.switchView('tax', this)">
+          <span class="nav-icon">💰</span> Tax & Compliance
+        </div>
+      </nav>
+
+      <div class="side-divider"></div>
+
+      <!-- Chat History -->
+      <div class="sl-section-label">Recent Chats</div>
+      <button class="new-chat-btn" onclick="APP.newChat()">+ New Conversation</button>
+      <div id="chatHistory"></div>
+
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main id="mainContent">
+
+      <!-- CHAT VIEW -->
+      <div id="view-chat" class="view active-view">
+        <div id="chatArea">
+          <!-- Welcome screen -->
+          <div id="welcome">
+            <div class="welcome-logo-wrap">
+              <img src="assets/hexa-logo.png" alt="Hexa CoPilot" class="welcome-logo">
+            </div>
+            <div class="welcome-title">Hexa CoPilot</div>
+            <div class="welcome-sub" id="welcomeSub">
+              Your AI-powered Finance Intelligence assistant for <strong id="welcomeOrg">Hexamatics Group</strong>.
+              Ask anything about invoices, AR/AP, expenses, payroll, tax, and financial reports — all answered live from Zoho Books.
+            </div>
+            <div class="quick-chips" id="quickChips"></div>
+          </div>
+
+          <!-- Messages -->
+          <div id="messages"></div>
+        </div>
+
+        <!-- Input Bar -->
+        <div id="inputBar">
+          <div class="input-action-row">
+            <button class="inp-action" onclick="APP.askQuick('Show AR aging analysis')">📊 AR Aging</button>
+            <button class="inp-action" onclick="APP.askQuick('List outstanding invoices')">🧾 Invoices</button>
+            <button class="inp-action" onclick="APP.askQuick('Show expense breakdown')">📋 Expenses</button>
+            <button class="inp-action" onclick="APP.askQuick('P&L summary this year')">📈 P&L</button>
+            <button class="inp-action" onclick="APP.askQuick('Cash flow and bank balance')">🏦 Cash Flow</button>
+          </div>
+          <div class="input-wrap" id="inputWrap">
+            <textarea id="msgInput"
+              rows="1"
+              placeholder="Ask about invoices, AR/AP, payments, expenses, tax, reports…"
+              onkeydown="APP.handleKey(event)"
+              oninput="APP.autoResize(this)"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="APP.sendMessage()" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+          <div class="input-hint">Hexa CoPilot · OpenAI GPT-4o + Live Zoho Books · Scoped to <span id="currentOrgLabel">—</span></div>
+        </div>
+      </div>
+
+      <!-- INVOICES VIEW -->
+      <div id="view-invoices" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">🧾 Invoices</div>
+            <div class="view-sub" id="invoices-sub">Live from Zoho Books</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Show detailed invoice analysis with aging and collection forecast')">Ask AI about Invoices →</button>
+        </div>
+        <div class="view-body" id="invoices-body"><div class="view-loading">Loading invoice data…</div></div>
+      </div>
+
+      <!-- PAYMENTS VIEW -->
+      <div id="view-payments" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">💳 Payments</div>
+            <div class="view-sub">Customer & vendor payments</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Summarize all payments and outstanding collections this month')">Ask AI about Payments →</button>
+        </div>
+        <div class="view-body" id="payments-body"><div class="view-loading">Loading payment data…</div></div>
+      </div>
+
+      <!-- EXPENSES VIEW -->
+      <div id="view-expenses" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">📋 Expenses</div>
+            <div class="view-sub">Expense management & analysis</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Expense variance analysis and top categories this month')">Ask AI about Expenses →</button>
+        </div>
+        <div class="view-body" id="expenses-body"><div class="view-loading">Loading expense data…</div></div>
+      </div>
+
+      <!-- AP VIEW -->
+      <div id="view-ap" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">📤 Accounts Payable</div>
+            <div class="view-sub">Vendor bills & payables</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Show all overdue vendor bills and AP aging')">Ask AI about AP →</button>
+        </div>
+        <div class="view-body" id="ap-body"><div class="view-loading">Loading AP data…</div></div>
+      </div>
+
+      <!-- REPORTS VIEW -->
+      <div id="view-reports" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">📊 Financial Reports</div>
+            <div class="view-sub">P&L, Balance Sheet, Cash Flow</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Generate full financial report with P&L, Balance Sheet and Cash Flow commentary')">Ask AI for Full Report →</button>
+        </div>
+        <div class="view-body" id="reports-body"><div class="view-loading">Loading report data…</div></div>
+      </div>
+
+      <!-- INTERCOMPANY VIEW -->
+      <div id="view-intercompany" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">🔗 Intercompany</div>
+            <div class="view-sub">Cross-entity balances & transactions</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('Show all intercompany balances, eliminations and related party disclosures')">Ask AI about Intercompany →</button>
+        </div>
+        <div class="view-body" id="intercompany-body"><div class="view-loading">Loading intercompany data…</div></div>
+      </div>
+
+      <!-- TAX VIEW -->
+      <div id="view-tax" class="view">
+        <div class="view-header">
+          <div>
+            <div class="view-title">💰 Tax & Compliance</div>
+            <div class="view-sub">GST, withholding tax, provisions</div>
+          </div>
+          <button class="view-btn" onclick="APP.askQuick('What are outstanding tax liabilities, GST filings due and tax provisions?')">Ask AI about Tax →</button>
+        </div>
+        <div class="view-body" id="tax-body"><div class="view-loading">Loading tax data…</div></div>
+      </div>
+
+    </main>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside id="sideR">
+      <div class="sl-section-label" id="snapshotLabel">📊 Snapshot</div>
+
+      <!-- Stat cards injected by JS -->
+      <div id="statCards"></div>
+
+      <div class="side-divider"></div>
+      <div class="sl-section-label">Quick Modules</div>
+      <div class="mod-grid" id="modGrid"></div>
+
+      <div class="side-divider"></div>
+      <div class="sl-section-label">Live Activity</div>
+      <div id="activityFeed"></div>
+
+    </aside>
+
+  </div><!-- .app-body -->
+
+</div><!-- #app -->
+
+<!-- Scripts -->
+<script src="js/orgs.js"></script>
+<script src="js/prompts.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/gemini.js"></script>
+<script src="js/app.js"></script>
+<script>
+  // Show current page URL as redirect URI hint for OAuth setup
+  const urlEl = document.getElementById("currentUrl");
+  if (urlEl) urlEl.textContent = window.location.href.split("?")[0].replace(/#.*$/, "");
+</script>
+</body>
+</html>
