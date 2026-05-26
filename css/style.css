@@ -572,6 +572,89 @@ table.vt tr:hover td { background: rgba(255,255,255,0.025); cursor: default; }
 .btn-connect:hover { opacity: 0.88; }
 .modal-footer { font-size: 10.5px; color: var(--muted); text-align: center; margin-top: 16px; }
 
+/* ── LOGO BLEND FIX — removes black PNG background on dark theme ─── */
+.tb-logo-img,
+.welcome-logo,
+.modal-logo-img,
+.login-logo-img {
+  mix-blend-mode: screen;
+}
+
+/* ── LOGIN PAGE ──────────────────────────────────────────────────── */
+#loginPage {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  background: rgba(15,22,40,0.92);
+  border: 1px solid var(--border-b);
+  border-radius: var(--rXL); padding: 44px 48px;
+  width: 420px; max-width: 95vw;
+  box-shadow: 0 0 80px rgba(123,47,190,0.3), 0 0 0 1px rgba(255,45,139,0.08);
+  backdrop-filter: blur(20px);
+  text-align: center;
+}
+.login-logo-wrap { margin-bottom: 6px; }
+.login-logo-img {
+  height: 60px; object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(255,45,139,0.5));
+}
+.login-title {
+  font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800;
+  background: var(--hx-grad);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+.login-sub {
+  font-size: 10px; color: var(--muted); letter-spacing: 2.5px;
+  text-transform: uppercase; margin-bottom: 0;
+}
+.login-error {
+  color: var(--red); font-size: 12px; min-height: 18px;
+  margin-bottom: 6px; text-align: left;
+}
+.login-footer { font-size: 10.5px; color: rgba(106,122,146,0.5); margin-top: 22px; }
+
+/* ── AVATAR DROPDOWN ─────────────────────────────────────────────── */
+.avatar-wrap { position: relative; }
+.avatar-menu {
+  position: absolute; top: 44px; right: 0;
+  background: var(--card); border: 1px solid var(--border-b);
+  border-radius: var(--r); min-width: 200px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  z-index: 200; overflow: hidden;
+  animation: fadeUp 0.15s ease both;
+}
+.avatar-menu-name {
+  padding: 12px 16px 2px; font-size: 13px; font-weight: 600; color: var(--text);
+}
+.avatar-menu-role {
+  padding: 0 16px 10px; font-size: 10px; color: var(--muted);
+  letter-spacing: 1.5px; text-transform: uppercase;
+}
+.avatar-menu-sep { height: 1px; background: var(--border); }
+.avatar-menu-item {
+  padding: 11px 16px; font-size: 13px; color: var(--text-s);
+  cursor: pointer; transition: background 0.14s; display: flex; align-items: center;
+}
+.avatar-menu-item:hover { background: rgba(123,47,190,0.1); color: var(--text); }
+.avatar-menu-item.danger { color: var(--red); }
+.avatar-menu-item.danger:hover { background: rgba(248,113,113,0.08); }
+
+/* Settings status bar in modal */
+.settings-status {
+  border-radius: 8px; padding: 8px 12px; margin-bottom: 14px;
+  font-size: 12px; display: none;
+}
+.settings-status.connected {
+  display: block; background: rgba(74,222,128,0.08);
+  border: 1px solid rgba(74,222,128,0.2); color: var(--green);
+}
+.settings-status.error {
+  display: block; background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.2); color: var(--red);
+}
+
 /* ── MODAL — ZOHO CONNECTION TABS ────────────────────────────────── */
 .form-divider {
   display: flex; align-items: center; gap: 10px;
