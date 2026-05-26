@@ -82,15 +82,19 @@ function _postLogin(session) {
     document.getElementById("settingsMenuSep").style.display  = "";
   }
 
-  // Auto-connect if config is already saved
-  const config = getConfig();
-  if (config) {
+  // Auto-connect if config is already saved (also catches post-OAuth auto-save)
+  const config   = getConfig();
+  const oauthErr = sessionStorage.getItem("zoho_oauth_error");
+  if (oauthErr) {
+    sessionStorage.removeItem("zoho_oauth_error");
+    document.getElementById("settingsModal").classList.remove("hidden");
+    const s = document.getElementById("settingsStatus");
+    if (s) { s.className = "settings-status error"; s.textContent = "OAuth failed: " + oauthErr; }
+  } else if (config) {
     _autoConnect(config, session);
   } else if (session.role === "admin") {
-    // Admin needs to set up connection
     document.getElementById("settingsModal").classList.remove("hidden");
   } else {
-    // Non-admin, no config yet — show a holding screen
     _showNoConfig();
   }
 }
@@ -257,25 +261,16 @@ async function _handleOAuthCallback() {
   const savedOpenAI = sessionStorage.getItem("zoho_pending_openai") || "";
   sessionStorage.removeItem("zoho_pending_openai");
 
-  const statusEl = document.getElementById("oauthStatus");
   try {
     const token  = await GEMINI.exchangeCodeForToken(code);
     const region = sessionStorage.getItem("zoho_region") || "com";
+    sessionStorage.removeItem("zoho_region");
 
-    document.getElementById("zohoToken").value  = token;
-    document.getElementById("zohoRegion").value = region;
-    if (savedOpenAI) document.getElementById("openaiKey").value = savedOpenAI;
-
-    switchModalTab("token", document.querySelector(".tab-btn"));
-    if (statusEl) {
-      statusEl.textContent = "✓ Authorized. Click Save & Connect →";
-      statusEl.style.color = "#4ADE80";
-    }
+    // Auto-save so _postLogin → _autoConnect launches the app directly
+    saveConfig(savedOpenAI, token, region);
   } catch (err) {
-    if (statusEl) {
-      statusEl.textContent = "OAuth failed: " + err.message;
-      statusEl.style.color = "#F87171";
-    }
+    // Persist error so _postLogin can display it in the settings modal
+    sessionStorage.setItem("zoho_oauth_error", err.message);
   }
 }
 
