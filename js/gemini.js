@@ -24,26 +24,27 @@ const GEMINI = {
     this.zohoRegion = zohoRegion;
   },
 
-  // ── ZOHO REST HELPER ────────────────────────────────────────────────
+  // ── ZOHO REST HELPER (via server-side proxy to avoid CORS) ─────────
   async _zohoGet(path, params = {}) {
-    const url = new URL(`${this.zohoApiBase}/books/v3/${path}`);
-    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-
     let res;
     try {
-      res = await fetch(url.toString(), {
-        headers: { "Authorization": `Zoho-oauthtoken ${this.zohoToken}` }
+      res = await fetch("/api/zoho-proxy", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ token: this.zohoToken, region: this.zohoRegion, path, params }),
       });
     } catch (e) {
-      throw new Error("Cannot reach Zoho API. Check your network or CORS settings (app must be served over HTTP/HTTPS, not file://).");
+      throw new Error("Cannot reach Zoho proxy. Check your network connection.");
     }
 
-    if (res.status === 401) throw new Error("Zoho token expired or invalid. Please reconnect.");
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `Zoho API error ${res.status}`);
+    const data = await res.json();
+    if (res.status === 401 || data.code === 57 || data.code === 14) {
+      throw new Error("Zoho token expired or invalid. Please reconnect.");
     }
-    return res.json();
+    if (!res.ok || data.code === 0 && data.message) {
+      throw new Error(data.message || data.error || `Zoho API error ${res.status}`);
+    }
+    return data;
   },
 
   // ── FETCH ALL ORGANIZATIONS ─────────────────────────────────────────
