@@ -1,11 +1,11 @@
-// ── prompts.js — Hexa CoPilot AI System Prompts ──────────────────────
+// ── prompts.js — HexaFin.AI System Prompts ────────────────────────────
 // Org-aware, IFRS-aware system prompts for each financial module
 
 const PROMPTS = {
 
   // ── BASE SYSTEM PROMPT (injected for every query) ─────────────────
   base(org) {
-    return `You are Hexa CoPilot — the AI-powered Finance Intelligence assistant for Hexamatics Group, a multi-entity EOR, staffing, finance outsourcing, and technology company headquartered in Malaysia with entities across Asia Pacific.
+    return `You are HexaFin.AI — the AI-powered Finance Intelligence assistant for Hexamatics Group, a multi-entity EOR, staffing, finance outsourcing, and technology company headquartered in Malaysia with entities across Asia Pacific.
 
 ACTIVE ORGANISATION: ${org.name} (${org.short}) | ${org.country} | ${org.type}
 REPORTING CURRENCY: ${org.currency} (${org.currencySymbol})

@@ -1,4 +1,4 @@
-// ── app.js — Hexa CoPilot Main Application Controller ─────────────────
+// ── app.js — HexaFin.AI Main Application Controller ───────────────────
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 // Hardcoded admin. Extra users stored in localStorage under hx_users.
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
 // ── LOGIN ─────────────────────────────────────────────────────────────
 function doLogin() {
   const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-  const pwd   = document.getElementById("loginPwd").value;
+  const pwd   = document.getElementById("loginPwd").value.trim();
   const errEl = document.getElementById("loginError");
   errEl.textContent = "";
 
@@ -541,10 +541,10 @@ const APP = {
       document.getElementById(typingId)?.remove();
       msgs.innerHTML += `
         <div class="msg">
-          <div class="msg-av ai-av">HC</div>
+          <div class="msg-av ai-av">HF</div>
           <div class="msg-wrap">
             ${RENDERER.renderAIResponse(result)}
-            <div class="msg-meta">Hexa CoPilot · ${this.currentOrg.name} · ${this.ts()}</div>
+            <div class="msg-meta">HexaFin.AI · ${this.currentOrg.name} · ${this.ts()}</div>
           </div>
         </div>`;
       this.messages.push({ role:"user", content:q });
@@ -553,13 +553,13 @@ const APP = {
       document.getElementById(typingId)?.remove();
       msgs.innerHTML += `
         <div class="msg">
-          <div class="msg-av ai-av">HC</div>
+          <div class="msg-av ai-av">HF</div>
           <div class="msg-wrap">
             <div class="bubble ai-bubble">
               <strong>Error</strong><br>${this._escHtml(err.message)}<br>
               <small style="color:var(--muted)">Check API keys in Settings or contact admin.</small>
             </div>
-            <div class="msg-meta">Hexa CoPilot · ${this.ts()}</div>
+            <div class="msg-meta">HexaFin.AI · ${this.ts()}</div>
           </div>
         </div>`;
     }
