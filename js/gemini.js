@@ -38,11 +38,15 @@ const GEMINI = {
     }
 
     const data = await res.json();
-    if (res.status === 401 || data.code === 57 || data.code === 14) {
+    // Zoho uses code 0 = success, non-zero = error
+    if (data.code === 57 || data.code === 14 || res.status === 401) {
       throw new Error("Zoho token expired or invalid. Please reconnect.");
     }
-    if (!res.ok || data.code === 0 && data.message) {
-      throw new Error(data.message || data.error || `Zoho API error ${res.status}`);
+    if (data.code !== undefined && data.code !== 0) {
+      throw new Error(data.message || `Zoho error ${data.code}`);
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `Zoho API error ${res.status}`);
     }
     return data;
   },
