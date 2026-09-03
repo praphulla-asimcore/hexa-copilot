@@ -5,6 +5,8 @@
 
 const GEMINI = {
 
+  dataStartDate: "2023-01-01",
+
   // Kept as a no-op so older call sites (APP bootstrap) don't break.
   init() {},
 
@@ -102,7 +104,13 @@ const GEMINI = {
 
   // ── FETCH MODULE VIEW DATA (full paginated history) ─────────────────
   async fetchModuleData(view, orgId) {
-    const p = { organization_id: orgId, sort_column: "date", sort_order: "D" };
+    const p = {
+      organization_id: orgId,
+      date_start: this.dataStartDate,
+      date_end: new Date().toISOString().split("T")[0],
+      sort_column: "date",
+      sort_order: "D",
+    };
     switch (view) {
       case "invoices": {
         const rows = await this._zohoGetAll("invoices", { ...p, status: "unpaid", sort_column: "due_date", sort_order: "A" });

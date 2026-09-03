@@ -84,10 +84,8 @@ function buildOrgFromZoho(apiOrg) {
     .toUpperCase()
     .substring(0, 6);
 
-  // FY label from fiscal_year_start_month (1=Jan)
-  const fyStart = apiOrg.fiscal_year_start_month || 1;
-  const fyEnd   = ((fyStart - 2 + 12) % 12);      // index of month before start
-  const fyLabel = `${FY_MONTHS[fyStart - 1]}–${FY_MONTHS[fyEnd]}`;
+    // The Group financial year follows the calendar year.
+    const fyLabel = "Jan–Dec";
 
   const taxes = COUNTRY_TAXES[country] || ["Tax"];
 

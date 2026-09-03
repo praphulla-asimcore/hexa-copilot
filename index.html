@@ -71,6 +71,7 @@
           <div class="avatar-menu-name" id="avatarMenuName">User</div>
           <div class="avatar-menu-role" id="avatarMenuRole">Member</div>
           <div class="avatar-menu-sep"></div>
+            <button class="avatar-menu-item hidden" id="manageUsersBtn" type="button" onclick="openUserManager()">Manage users</button>
           <button class="avatar-menu-item danger" type="button" onclick="doLogout()">Sign Out</button>
         </div>
       </div>
@@ -206,6 +207,7 @@
         <div class="view-header">
           <div>
             <div class="view-title">Invoices</div>
+
             <div class="view-sub" id="invoices-sub">Live financial data</div>
           </div>
           <button class="view-btn" onclick="APP.askQuick('Show detailed invoice analysis with aging and collection forecast')">Ask AI about Invoices</button>
@@ -299,6 +301,40 @@
       <div id="activityFeed"></div>
     </aside>
 
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="userManagerModal" role="dialog" aria-modal="true" aria-labelledby="userManagerTitle">
+  <div class="modal-box user-manager-box">
+    <div class="modal-title" id="userManagerTitle">Manage users</div>
+    <div class="modal-sub">Admin access</div>
+    <div id="userManagerError" class="login-error" role="alert" aria-live="polite"></div>
+    <form onsubmit="addUser(event)">
+      <div class="form-group">
+        <label for="newUserName">Full name</label>
+        <input id="newUserName" type="text" autocomplete="name" required>
+      </div>
+      <div class="form-group">
+        <label for="newUserEmail">Email address</label>
+        <input id="newUserEmail" type="email" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="newUserPassword">Temporary password</label>
+        <input id="newUserPassword" type="password" minlength="8" autocomplete="new-password" required>
+      </div>
+      <div class="form-group">
+        <label for="newUserRole">Role</label>
+        <select id="newUserRole">
+          <option value="staff">Staff</option>
+          <option value="auditor">Auditor</option>
+          <option value="timesheet_staff">Timesheet staff</option>
+        </select>
+      </div>
+      <button class="btn-connect" type="submit">Add user</button>
+      <button class="avatar-menu-item modal-cancel" type="button" onclick="closeUserManager()">Cancel</button>
+    </form>
+    <div class="user-list-title">Current users</div>
+    <div id="userManagerList"></div>
   </div>
 </div>
 

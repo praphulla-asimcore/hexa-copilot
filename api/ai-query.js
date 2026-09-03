@@ -18,9 +18,14 @@ function loadCompanyPolicy() {
 }
 
 const COMPANY_POLICY = loadCompanyPolicy();
+const MIN_DATA_DATE = "2023-01-01";
+
+function todayDate() {
+  return new Date().toISOString().split("T")[0];
+}
 
 // ── DATE RANGE PARSER ─────────────────────────────────────────────────
-function parseDateRange(query, wideSearch = false) {
+function _parseDateRange(query, wideSearch = false) {
   const q   = query.toLowerCase();
   const now = new Date();
   const cy  = now.getFullYear();
@@ -74,9 +79,16 @@ function parseDateRange(query, wideSearch = false) {
     const d=new Date(now); d.setFullYear(d.getFullYear()-3);
     return { from:d.toISOString().split("T")[0], to:now.toISOString().split("T")[0], label:"last 3 years" };
   }
-  // default 12 months
-  const d12=new Date(now); d12.setFullYear(d12.getFullYear()-1);
-  return { from:d12.toISOString().split("T")[0], to:now.toISOString().split("T")[0], label:"last 12 months" };
+  // Default to the full available history.
+  return { from:MIN_DATA_DATE, to:now.toISOString().split("T")[0], label:"available history" };
+}
+
+function parseDateRange(query, wideSearch = false) {
+  const range = _parseDateRange(query, wideSearch);
+  const today = todayDate();
+  const from = range.from < MIN_DATA_DATE ? MIN_DATA_DATE : (range.from > today ? today : range.from);
+  const to = range.to < MIN_DATA_DATE ? MIN_DATA_DATE : (range.to > today ? today : range.to);
+  return { ...range, from, to, label: range.label };
 }
 
 // ── ZOHO HELPERS ──────────────────────────────────────────────────────

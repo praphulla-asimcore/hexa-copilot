@@ -27,6 +27,55 @@ function saveSession(user) {
 
 function clearSession() { localStorage.removeItem("hx_session"); }
 
+function _userInitials(name) {
+  return name.split(/\s+/).filter(Boolean).map(part => part[0]).join("").substring(0, 2).toUpperCase() || "U";
+}
+
+function openUserManager() {
+  const session = getSession();
+  if (session?.role !== "admin") return;
+  document.getElementById("avatarMenu")?.classList.add("hidden");
+  document.getElementById("userManagerError").textContent = "";
+  document.getElementById("userManagerModal").classList.remove("hidden");
+  renderUserManager();
+}
+
+function closeUserManager() {
+  document.getElementById("userManagerModal")?.classList.add("hidden");
+}
+
+function renderUserManager() {
+  const users = getUsers();
+  document.getElementById("userManagerList").innerHTML = users.map(user => `
+    <div class="user-list-item">
+      <div><div class="user-list-name">${APP._escHtml(user.name)}</div><div class="user-list-email">${APP._escHtml(user.email)}</div></div>
+      <div class="user-list-role">${APP._escHtml(user.role)}</div>
+    </div>`).join("");
+}
+
+function addUser(event) {
+  event.preventDefault();
+  const session = getSession();
+  if (session?.role !== "admin") return;
+
+  const name = document.getElementById("newUserName").value.trim();
+  const email = document.getElementById("newUserEmail").value.trim().toLowerCase();
+  const password = document.getElementById("newUserPassword").value;
+  const role = document.getElementById("newUserRole").value;
+  const error = document.getElementById("userManagerError");
+  if (getUsers().some(user => user.email.toLowerCase() === email)) {
+    error.textContent = "A user with that email already exists.";
+    return;
+  }
+
+  const users = JSON.parse(localStorage.getItem("hx_users") || "[]");
+  users.push({ email, password, role, name, initials: _userInitials(name) });
+  localStorage.setItem("hx_users", JSON.stringify(users));
+  event.target.reset();
+  error.textContent = "User added successfully.";
+  renderUserManager();
+}
+
 // ── PAGE BOOT ─────────────────────────────────────────────────────────
 // Credentials (OpenAI + Zoho) live server-side in environment variables.
 // The client only gates access with a login and then boots the app.
@@ -60,6 +109,7 @@ function _postLogin(session) {
   document.getElementById("userInitials").textContent = session.initials || session.name?.substring(0, 2).toUpperCase() || "U";
   document.getElementById("avatarMenuName").textContent = session.name;
   document.getElementById("avatarMenuRole").textContent = session.role === "admin" ? "Admin" : "Member";
+  document.getElementById("manageUsersBtn")?.classList.toggle("hidden", session.role !== "admin");
 
   _bootstrap();
 }
@@ -211,7 +261,7 @@ const APP = {
 
     document.getElementById("orgFlag").textContent   = org.flag;
     document.getElementById("orgName").textContent   = org.name;
-    document.getElementById("orgDetail").textContent = `${org.country} · ${org.type} · FY${new Date().getFullYear()}`;
+    document.getElementById("orgDetail").textContent = `${org.country} · ${org.type} · Jan–Dec FY`;
     document.getElementById("orgTags").innerHTML     = org.tags.map(t => `<span class="org-tag">${t}</span>`).join("");
     document.getElementById("currentOrgLabel").textContent = org.name;
     document.getElementById("welcomeOrg").textContent      = org.name;
