@@ -226,11 +226,11 @@ function buildPnlFacts(report) {
   sections.forEach(section => {
     (section.account_transactions || []).forEach(group => {
       const name = String(group.name || "").toLowerCase();
-      if (name.includes("operating income")) addAccounts(facts.income, group);
-      else if (name.includes("cost of goods sold")) addAccounts(facts.costOfGoodsSold, group);
-      else if (name.includes("operating expense")) addAccounts(facts.operatingExpenses, group);
-      else if (name.includes("non operating income")) addAccounts(facts.otherIncome, group);
+      if (name.includes("non operating income")) addAccounts(facts.otherIncome, group);
       else if (name.includes("non operating expense")) addAccounts(facts.otherExpenses, group);
+      else if (name === "operating income") addAccounts(facts.income, group);
+      else if (name === "cost of goods sold") addAccounts(facts.costOfGoodsSold, group);
+      else if (name === "operating expense") addAccounts(facts.operatingExpenses, group);
     });
   });
   addAccounts(facts.income, report.income);
