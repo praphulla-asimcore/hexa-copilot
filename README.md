@@ -28,6 +28,23 @@ Browser ──► /api/zoho-proxy ──┐
 
 Set all of them for the **Production** environment, then redeploy.
 
+## User invitation email
+
+Admin-created users receive invitations through Resend. Add these variables to
+the Vercel **Production** environment, then redeploy:
+
+| Variable | Required | Notes |
+|---|---|---|
+| `RESEND_API_KEY` | yes | Resend API key with permission to send mail |
+| `INVITE_FROM_EMAIL` | yes | A sender address from a verified Resend domain, e.g. `Guru Ji <noreply@your-domain.com>` |
+| `INVITE_SECRET` | yes | Long random secret used to sign seven-day invitation links |
+| `APP_URL` | no | Production URL; defaults to `https://ai.hexamatics.finance` |
+
+The current login system remains browser-local, so recipients activate their
+account through the invitation link on their own browser. A shared server-side
+identity system is required for centralized account management, password reset,
+and immediate account revocation.
+
 ## One-time Zoho refresh-token setup
 
 1. In the [Zoho API console](https://api-console.zoho.com), create a **Server-based

@@ -53,7 +53,7 @@ function renderUserManager() {
     </div>`).join("");
 }
 
-function addUser(event) {
+async function addUser(event) {
   event.preventDefault();
   const session = getSession();
   if (session?.role !== "admin") return;
@@ -68,11 +68,34 @@ function addUser(event) {
     return;
   }
 
+  const submitButton = event.submitter;
+  submitButton.disabled = true;
+  error.textContent = "Sending invitation…";
+  let response;
+  try {
+    response = await fetch("/api/user-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    });
+  } catch (_) {
+    submitButton.disabled = false;
+    error.textContent = "Could not reach the invitation service.";
+    return;
+  }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    submitButton.disabled = false;
+    error.textContent = result.error || "Invitation could not be sent.";
+    return;
+  }
+
   const users = JSON.parse(localStorage.getItem("hx_users") || "[]");
   users.push({ email, password, role, name, initials: _userInitials(name) });
   localStorage.setItem("hx_users", JSON.stringify(users));
   event.target.reset();
-  error.textContent = "User added successfully.";
+  submitButton.disabled = false;
+  error.textContent = "Invitation sent successfully.";
   renderUserManager();
 }
 
@@ -80,6 +103,16 @@ function addUser(event) {
 // Credentials (OpenAI + Zoho) live server-side in environment variables.
 // The client only gates access with a login and then boots the app.
 document.addEventListener("DOMContentLoaded", () => {
+  const pendingUser = localStorage.getItem("hx_pending_user");
+  if (pendingUser) {
+    const users = JSON.parse(localStorage.getItem("hx_users") || "[]");
+    const user = JSON.parse(pendingUser);
+    const existingIndex = users.findIndex(item => item.email === user.email);
+    if (existingIndex >= 0) users[existingIndex] = user;
+    else users.push(user);
+    localStorage.setItem("hx_users", JSON.stringify(users));
+    localStorage.removeItem("hx_pending_user");
+  }
   const session = getSession();
   if (session) _postLogin(session);
   // Otherwise loginPage stays visible (default)
