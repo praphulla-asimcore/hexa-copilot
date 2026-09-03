@@ -27,37 +27,15 @@ function saveSession(user) {
 
 function clearSession() { localStorage.removeItem("hx_session"); }
 
-// ── CONFIG (API keys — shared for all users once admin saves) ─────────
-function getConfig() {
-  return JSON.parse(localStorage.getItem("hx_config") || "null");
-}
-
-function saveConfig(openaiKey, zohoToken, zohoRegion, zohoRefreshToken, zohoClientId, zohoClientSecret) {
-  const existing = getConfig() || {};
-  localStorage.setItem("hx_config", JSON.stringify({
-    ...existing,
-    openaiKey,
-    zohoToken,
-    zohoRegion,
-    ...(zohoRefreshToken  ? { zohoRefreshToken  } : {}),
-    ...(zohoClientId      ? { zohoClientId      } : {}),
-    ...(zohoClientSecret  ? { zohoClientSecret  } : {}),
-  }));
-}
-
 // ── PAGE BOOT ─────────────────────────────────────────────────────────
-// Start particles immediately (visible on login screen too)
+// Credentials (OpenAI + Zoho) live server-side in environment variables.
+// The client only gates access with a login and then boots the app.
 document.addEventListener("DOMContentLoaded", () => {
   _startParticles();
 
-  // Handle OAuth callback before checking session
-  _handleOAuthCallback().then(() => {
-    const session = getSession();
-    if (session) {
-      _postLogin(session);
-    }
-    // Otherwise loginPage stays visible (default)
-  });
+  const session = getSession();
+  if (session) _postLogin(session);
+  // Otherwise loginPage stays visible (default)
 });
 
 // ── LOGIN ─────────────────────────────────────────────────────────────
@@ -85,56 +63,26 @@ function _postLogin(session) {
   document.getElementById("avatarMenuName").textContent = session.name;
   document.getElementById("avatarMenuRole").textContent = session.role === "admin" ? "Admin" : "Member";
 
-  // Show Settings menu item for admin only
-  if (session.role === "admin") {
-    document.getElementById("settingsMenuItem").style.display = "";
-    document.getElementById("settingsMenuSep").style.display  = "";
-  }
-
-  // Auto-connect if config is already saved (also catches post-OAuth auto-save)
-  const config   = getConfig();
-  const oauthErr = sessionStorage.getItem("zoho_oauth_error");
-  if (oauthErr) {
-    sessionStorage.removeItem("zoho_oauth_error");
-    document.getElementById("settingsModal").classList.remove("hidden");
-    const s = document.getElementById("settingsStatus");
-    if (s) { s.className = "settings-status error"; s.textContent = "OAuth failed: " + oauthErr; }
-  } else if (config) {
-    _autoConnect(config, session);
-  } else if (session.role === "admin") {
-    document.getElementById("settingsModal").classList.remove("hidden");
-  } else {
-    _showNoConfig();
-  }
+  _bootstrap();
 }
 
-async function _autoConnect(config, session) {
+// Load organisations from the server (which holds the Zoho credentials) and
+// launch. No API keys are ever requested from the user.
+async function _bootstrap() {
   try {
-    GEMINI.init(config.openaiKey, config.zohoToken, config.zohoRegion);
     const zohoOrgs = await GEMINI.fetchOrganizations();
-    if (!zohoOrgs.length) throw new Error("No Zoho Books organisations found.");
+    if (!zohoOrgs.length) throw new Error("No Zoho Books organisations found for the connected account.");
     ORGS.length = 0;
     zohoOrgs.forEach(o => ORGS.push(buildOrgFromZoho(o)));
     _launchApp();
   } catch (err) {
-    // Stale config — admin must re-authenticate
-    if (session?.role === "admin") {
-      _prefillSettings(config);
-      const statusEl = document.getElementById("settingsStatus");
-      statusEl.className = "settings-status error";
-      statusEl.textContent = "⚠ Previous connection failed: " + err.message + " — please reconnect.";
-      document.getElementById("settingsModal").classList.remove("hidden");
-    } else {
-      _showNoConfig("Connection error. Please ask your admin to reconnect Zoho Books.");
-    }
+    _showNoConfig("Could not connect to Zoho Books: " + err.message);
   }
 }
 
 function _launchApp() {
-  document.getElementById("settingsModal").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
   document.querySelector(".live-dot").classList.add("online");
-  const c = getConfig();
   document.getElementById("liveText").textContent =
     `Live · ${ORGS.length} org${ORGS.length !== 1 ? "s" : ""} · OpenAI + Zoho Books`;
   APP.init();
@@ -146,21 +94,14 @@ function _showNoConfig(msg) {
   // Show a message in the chat area
   document.getElementById("welcome").innerHTML = `
     <div style="text-align:center;padding:60px 20px">
-      <div style="font-size:40px;margin-bottom:16px">⚙</div>
       <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:10px">
         Setup Required
       </div>
-      <div style="font-size:13px;color:var(--muted);line-height:1.8;max-width:360px;margin:0 auto">
-        ${msg || "The admin hasn't configured the Zoho Books connection yet.<br>Please contact your administrator to set it up."}
+      <div style="font-size:13px;color:var(--muted);line-height:1.8;max-width:420px;margin:0 auto">
+        ${msg || "The server is missing its OpenAI / Zoho Books credentials.<br>An administrator needs to set the OPENAI_API_KEY and ZOHO_* environment variables and redeploy."}
       </div>
     </div>`;
   APP.initShell();
-}
-
-function _prefillSettings(config) {
-  if (config.openaiKey)  document.getElementById("openaiKey").value  = config.openaiKey;
-  if (config.zohoToken)  document.getElementById("zohoToken").value  = config.zohoToken;
-  if (config.zohoRegion) document.getElementById("zohoRegion").value = config.zohoRegion;
 }
 
 // ── LOGOUT ────────────────────────────────────────────────────────────
@@ -191,109 +132,6 @@ document.addEventListener("click", e => {
     document.getElementById("avatarMenu")?.classList.add("hidden");
   }
 });
-
-// ── SETTINGS (admin only) ─────────────────────────────────────────────
-function showSettings() {
-  document.getElementById("avatarMenu").classList.add("hidden");
-  const config = getConfig();
-  if (config) {
-    _prefillSettings(config);
-    const statusEl = document.getElementById("settingsStatus");
-    statusEl.className = "settings-status connected";
-    statusEl.textContent = `✓ Connected · ${ORGS.length} organisation${ORGS.length !== 1 ? "s" : ""} loaded`;
-  }
-  document.getElementById("settingsModal").classList.remove("hidden");
-}
-
-// ── CONNECT APIs (settings save) ──────────────────────────────────────
-async function connectAPIs() {
-  const openaiKey  = document.getElementById("openaiKey").value.trim();
-  const zohoToken  = document.getElementById("zohoToken").value.trim();
-  const zohoRegion = document.getElementById("zohoRegion").value;
-
-  if (!openaiKey.startsWith("sk-")) {
-    alert("Please enter a valid OpenAI API key (starts with sk-).");
-    return;
-  }
-  if (!zohoToken) {
-    alert("Please enter your Zoho Books access token.");
-    return;
-  }
-
-  const btn = document.getElementById("connectBtn");
-  btn.textContent = "Connecting…";
-  btn.disabled    = true;
-
-  try {
-    GEMINI.init(openaiKey, zohoToken, zohoRegion);
-    const zohoOrgs = await GEMINI.fetchOrganizations();
-    if (!zohoOrgs.length) throw new Error("No Zoho Books organisations found. Check scope: ZohoBooks.fullaccess.all");
-
-    ORGS.length = 0;
-    zohoOrgs.forEach(o => ORGS.push(buildOrgFromZoho(o)));
-
-    // Persist config for all users
-    saveConfig(openaiKey, zohoToken, zohoRegion);
-
-    _launchApp();
-  } catch (err) {
-    const statusEl = document.getElementById("settingsStatus");
-    statusEl.className = "settings-status error";
-    statusEl.textContent = "⚠ " + err.message;
-  } finally {
-    btn.textContent = "Save & Connect →";
-    btn.disabled    = false;
-  }
-}
-
-// ── OAUTH FLOW ────────────────────────────────────────────────────────
-async function startOAuthFlow() {
-  const clientId     = document.getElementById("zohoClientId").value.trim();
-  const clientSecret = document.getElementById("zohoClientSecret").value.trim();
-  const zohoRegion   = document.getElementById("zohoRegion").value;
-  if (!clientId) { alert("Please enter your Zoho Client ID."); return; }
-
-  const openaiKey = document.getElementById("openaiKey").value.trim();
-  if (openaiKey) sessionStorage.setItem("zoho_pending_openai", openaiKey);
-
-  GEMINI.zohoRegion = zohoRegion;
-  await GEMINI.startOAuth(clientId, clientSecret);
-}
-
-async function _handleOAuthCallback() {
-  const params = new URLSearchParams(window.location.search);
-  const code   = params.get("code");
-  if (!code) return;
-
-  window.history.replaceState({}, "", window.location.pathname);
-
-  const savedOpenAI = sessionStorage.getItem("zoho_pending_openai") || "";
-  sessionStorage.removeItem("zoho_pending_openai");
-
-  try {
-    const { accessToken, refreshToken } = await GEMINI.exchangeCodeForToken(code);
-    const region      = sessionStorage.getItem("zoho_region")        || "com";
-    const clientId    = sessionStorage.getItem("zoho_client_id")     || "";
-    const clientSecret= sessionStorage.getItem("zoho_client_secret") || "";
-    sessionStorage.removeItem("zoho_region");
-    sessionStorage.removeItem("zoho_client_id");
-    sessionStorage.removeItem("zoho_client_secret");
-
-    // Save access token + refresh token so we can auto-renew without re-auth
-    saveConfig(savedOpenAI, accessToken, region, refreshToken, clientId, clientSecret);
-  } catch (err) {
-    // Persist error so _postLogin can display it in the settings modal
-    sessionStorage.setItem("zoho_oauth_error", err.message);
-  }
-}
-
-// ── MODAL HELPERS ─────────────────────────────────────────────────────
-function switchModalTab(tab, el) {
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  if (el) el.classList.add("active");
-  document.getElementById("tab-token").style.display = tab === "token" ? "" : "none";
-  document.getElementById("tab-oauth").style.display = tab === "oauth" ? "" : "none";
-}
 
 // ── MAIN APP OBJECT ───────────────────────────────────────────────────
 const APP = {
@@ -429,7 +267,7 @@ const APP = {
     const sub  = document.getElementById(`${view}-sub`);
     if (!body) return;
 
-    body.innerHTML = `<div class="view-loading">⏳ Fetching live data from Zoho Books…</div>`;
+    body.innerHTML = `<div class="view-loading">Fetching live data from Zoho Books…</div>`;
     if (sub) sub.textContent = `${org.name} · ${org.currency} · Live`;
 
     if (["reports","intercompany","tax"].includes(view)) {
@@ -440,13 +278,12 @@ const APP = {
       };
       body.innerHTML = `
         <div style="text-align:center;padding:40px 20px">
-          <div style="font-size:32px;margin-bottom:14px">🤖</div>
           <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Ask AI for Live Analysis</div>
           <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7">
             This module queries your live Zoho Books data via AI.<br>Click below to get a full live analysis.
           </div>
           <button class="view-btn" onclick="APP.askQuick('${prompts[view]}')">
-            Get Live ${view.charAt(0).toUpperCase() + view.slice(1)} Analysis →
+            Get Live ${view.charAt(0).toUpperCase() + view.slice(1)} Analysis
           </button>
         </div>`;
       return;
@@ -458,7 +295,7 @@ const APP = {
     } catch (err) {
       body.innerHTML = `
         <div class="view-loading" style="color:var(--red)">
-          ⚠ ${err.message}<br>
+          ${err.message}<br>
           <small style="color:var(--muted);display:block;margin-top:6px">Check your Zoho token in Settings (admin).</small>
         </div>`;
     }
@@ -535,7 +372,7 @@ const APP = {
     const typingId = "typing-" + Date.now();
     msgs.innerHTML += `
       <div class="msg" id="${typingId}">
-        <div class="msg-av ai-av">HC</div>
+        <div class="msg-av ai-av">HF</div>
         <div class="msg-wrap">
           <div class="bubble ai-bubble">
             <div class="typing-dots"><div class="td"></div><div class="td"></div><div class="td"></div></div>
@@ -545,7 +382,7 @@ const APP = {
     this._scrollBottom();
 
     try {
-      const result = await GEMINI.query(q, this.currentOrg);
+      const result = await GEMINI.query(q, this.currentOrg, this.messages);
       document.getElementById(typingId)?.remove();
       msgs.innerHTML += `
         <div class="msg">
@@ -556,7 +393,8 @@ const APP = {
           </div>
         </div>`;
       this.messages.push({ role:"user", content:q });
-      this.messages.push({ role:"ai",   content:result.html });
+      // Strip HTML tags for the history so the AI receives plain text context
+      this.messages.push({ role:"ai", content: (result.html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() });
     } catch (err) {
       document.getElementById(typingId)?.remove();
       msgs.innerHTML += `

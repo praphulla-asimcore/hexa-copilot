@@ -10,18 +10,16 @@
 </head>
 <body>
 
-<!-- Animated background (visible through all layers) -->
 <div id="bg-hex"></div>
 <div id="bg-glow"></div>
 <canvas id="bg-particles"></canvas>
 
-<!-- ── LOGIN PAGE ─────────────────────────────────────────────────── -->
+<!-- ── LOGIN PAGE ─────────────────────────────────────────────── -->
 <div id="loginPage">
   <div class="login-card">
     <div class="login-logo-wrap">
       <img src="assets/hexa-logo.png" alt="HexaFin.AI" class="login-logo-img">
     </div>
-    <div class="login-title">HexaFin.AI</div>
     <div class="login-sub">Finance Intelligence Platform</div>
 
     <div class="form-group" style="margin-top:28px;text-align:left">
@@ -35,87 +33,13 @@
     </div>
     <div id="loginError" class="login-error"></div>
     <button class="btn-connect" id="loginBtn" onclick="doLogin()" style="width:100%;margin-top:4px">
-      Sign In →
+      Sign In
     </button>
     <div class="login-footer">Hexamatics Group · Private &amp; Confidential</div>
   </div>
 </div>
 
-<!-- ── SETTINGS MODAL (admin only) ───────────────────────────────── -->
-<div id="settingsModal" class="modal-overlay hidden">
-  <div class="modal-box">
-    <div class="modal-logo">
-      <img src="assets/hexa-logo.png" alt="Hexa" class="modal-logo-img">
-      <div class="modal-title">Settings</div>
-      <div class="modal-sub">API Configuration · Admin Only</div>
-    </div>
-
-    <div class="settings-status" id="settingsStatus"></div>
-
-    <!-- OpenAI Key -->
-    <div class="form-group">
-      <label>OpenAI API Key <span class="required">*</span></label>
-      <input type="password" id="openaiKey" placeholder="sk-proj-..." autocomplete="off">
-      <div class="field-hint">GPT-4o · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#7AB2F7">platform.openai.com/api-keys</a></div>
-    </div>
-
-    <!-- Zoho Region -->
-    <div class="form-group">
-      <label>Zoho Data Centre</label>
-      <select id="zohoRegion">
-        <option value="com">Global · zohoapis.com</option>
-        <option value="eu">Europe · zohoapis.eu</option>
-        <option value="in">India · zohoapis.in</option>
-        <option value="au">Australia · zohoapis.com.au</option>
-        <option value="jp">Japan · zohoapis.jp</option>
-        <option value="ca">Canada · zohoapis.ca</option>
-      </select>
-    </div>
-
-    <!-- Zoho Connection Tabs -->
-    <div class="form-divider"><span>Zoho Books Connection</span></div>
-    <div class="form-tabs">
-      <button class="tab-btn active" onclick="switchModalTab('token', this)">Access Token</button>
-      <button class="tab-btn" onclick="switchModalTab('oauth', this)">OAuth (Client ID)</button>
-    </div>
-
-    <!-- Tab: Access Token -->
-    <div id="tab-token">
-      <div class="form-group" style="margin-top:14px">
-        <label>Zoho Access Token <span class="required">*</span></label>
-        <input type="password" id="zohoToken" placeholder="1000.xxxxxxxxxxxxxxxx..." autocomplete="off">
-        <div class="field-hint">
-          <a href="https://api-console.zoho.com" target="_blank" style="color:#7AB2F7">api-console.zoho.com</a>
-          → Self Client → Scope: <code style="color:#C084FC">ZohoBooks.fullaccess.all</code>
-        </div>
-      </div>
-      <button class="btn-connect" id="connectBtn" onclick="connectAPIs()">Save &amp; Connect →</button>
-    </div>
-
-    <!-- Tab: OAuth -->
-    <div id="tab-oauth" style="display:none">
-      <div class="form-group" style="margin-top:14px">
-        <label>Zoho Client ID</label>
-        <input type="text" id="zohoClientId" placeholder="1000.XXXXXXXXXXXXXXXXXX" autocomplete="off">
-      </div>
-      <div class="form-group">
-        <label>Zoho Client Secret <span class="optional">(if required)</span></label>
-        <input type="password" id="zohoClientSecret" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-        <div class="field-hint">
-          Redirect URI: <span id="currentUrl" style="color:#C084FC;font-size:10px"></span>
-        </div>
-      </div>
-      <div id="oauthStatus" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
-      <button class="btn-connect" onclick="startOAuthFlow()">Authorize with Zoho →</button>
-    </div>
-
-    <div class="modal-footer" style="margin-top:18px">
-      Keys are encrypted in your browser's localStorage. Only accessible on this device.
-    </div>
-  </div>
-</div>
-
-<!-- ── MAIN APP ───────────────────────────────────────────────────── -->
+<!-- ── MAIN APP ─────────────────────────────────────────────────── -->
 <div id="app" class="hidden">
 
   <!-- TOPBAR -->
@@ -145,7 +69,6 @@
         Zoho Books
       </div>
 
-      <!-- User Avatar + Dropdown -->
       <div class="avatar-wrap" id="avatarWrap">
         <div class="user-avatar" id="userAvatar" onclick="toggleAvatarMenu()">
           <span id="userInitials">—</span>
@@ -155,11 +78,7 @@
           <div class="avatar-menu-name" id="avatarMenuName">User</div>
           <div class="avatar-menu-role" id="avatarMenuRole">Member</div>
           <div class="avatar-menu-sep"></div>
-          <div class="avatar-menu-item" id="settingsMenuItem" onclick="showSettings()" style="display:none">
-            ⚙ &nbsp;Connection Settings
-          </div>
-          <div class="avatar-menu-sep" id="settingsMenuSep" style="display:none"></div>
-          <div class="avatar-menu-item danger" onclick="doLogout()">→ &nbsp;Sign Out</div>
+          <div class="avatar-menu-item danger" onclick="doLogout()">Sign Out</div>
         </div>
       </div>
     </div>
@@ -177,7 +96,7 @@
       </div>
 
       <div class="org-card" id="orgCard">
-        <div class="org-flag" id="orgFlag">🏢</div>
+        <div class="org-flag" id="orgFlag"></div>
         <div class="org-name" id="orgName">—</div>
         <div class="org-detail" id="orgDetail">—</div>
         <div class="org-divider"></div>
@@ -187,30 +106,54 @@
       <div class="sl-section-label">Navigation</div>
       <nav id="mainNav">
         <div class="nav-item active" data-view="chat" onclick="APP.switchView('chat', this)">
-          <span class="nav-icon">💬</span> AI Chat
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          AI Chat
         </div>
         <div class="nav-item" data-view="invoices" onclick="APP.switchView('invoices', this)">
-          <span class="nav-icon">🧾</span> Invoices
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </span>
+          Invoices
           <span class="nav-badge hidden" id="badge-invoices"></span>
         </div>
         <div class="nav-item" data-view="payments" onclick="APP.switchView('payments', this)">
-          <span class="nav-icon">💳</span> Payments
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </span>
+          Payments
         </div>
         <div class="nav-item" data-view="expenses" onclick="APP.switchView('expenses', this)">
-          <span class="nav-icon">📋</span> Expenses
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </span>
+          Expenses
         </div>
         <div class="nav-item" data-view="ap" onclick="APP.switchView('ap', this)">
-          <span class="nav-icon">📤</span> AP / Bills
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          </span>
+          AP / Bills
           <span class="nav-badge red hidden" id="badge-ap"></span>
         </div>
         <div class="nav-item" data-view="reports" onclick="APP.switchView('reports', this)">
-          <span class="nav-icon">📊</span> Reports
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </span>
+          Reports
         </div>
         <div class="nav-item" data-view="intercompany" onclick="APP.switchView('intercompany', this)">
-          <span class="nav-icon">🔗</span> Intercompany
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </span>
+          Intercompany
         </div>
         <div class="nav-item" data-view="tax" onclick="APP.switchView('tax', this)">
-          <span class="nav-icon">💰</span> Tax &amp; Compliance
+          <span class="nav-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          Tax &amp; Compliance
         </div>
       </nav>
 
@@ -230,10 +173,9 @@
             <div class="welcome-logo-wrap">
               <img src="assets/hexa-logo.png" alt="HexaFin.AI" class="welcome-logo">
             </div>
-            <div class="welcome-title">HexaFin.AI</div>
             <div class="welcome-sub">
-              Your AI-powered Finance Intelligence assistant for <strong id="welcomeOrg">Hexamatics Group</strong>.
-              Ask anything about invoices, AR/AP, expenses, payroll, tax, and financial reports — all answered live from Zoho Books.
+              AI-powered Finance Intelligence for <strong id="welcomeOrg">Hexamatics Group</strong>.
+              Ask anything about invoices, AR/AP, expenses, payroll, tax, and financial reports — answered live from Zoho Books.
             </div>
             <div class="quick-chips" id="quickChips"></div>
           </div>
@@ -242,11 +184,11 @@
 
         <div id="inputBar">
           <div class="input-action-row">
-            <button class="inp-action" onclick="APP.askQuick('Show AR aging analysis')">📊 AR Aging</button>
-            <button class="inp-action" onclick="APP.askQuick('List outstanding invoices')">🧾 Invoices</button>
-            <button class="inp-action" onclick="APP.askQuick('Show expense breakdown')">📋 Expenses</button>
-            <button class="inp-action" onclick="APP.askQuick('P&L summary this year')">📈 P&L</button>
-            <button class="inp-action" onclick="APP.askQuick('Cash flow and bank balance')">🏦 Cash Flow</button>
+            <button class="inp-action" onclick="APP.askQuick('Show AR aging analysis')">AR Aging</button>
+            <button class="inp-action" onclick="APP.askQuick('List outstanding invoices')">Invoices</button>
+            <button class="inp-action" onclick="APP.askQuick('Show expense breakdown')">Expenses</button>
+            <button class="inp-action" onclick="APP.askQuick('P&L summary this year')">P&amp;L</button>
+            <button class="inp-action" onclick="APP.askQuick('Cash flow and bank balance')">Cash Flow</button>
           </div>
           <div class="input-wrap" id="inputWrap">
             <textarea id="msgInput" rows="1"
@@ -254,12 +196,12 @@
               onkeydown="APP.handleKey(event)"
               oninput="APP.autoResize(this)"></textarea>
             <button class="send-btn" id="sendBtn" onclick="APP.sendMessage()" disabled>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
             </button>
           </div>
-          <div class="input-hint">HexaFin.AI · OpenAI GPT-4o + Live Zoho Books · Scoped to <span id="currentOrgLabel">—</span></div>
+          <div class="input-hint">HexaFin.AI · OpenAI GPT-4o + Live Zoho Books · <span id="currentOrgLabel">—</span></div>
         </div>
       </div>
 
@@ -267,10 +209,10 @@
       <div id="view-invoices" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">🧾 Invoices</div>
+            <div class="view-title">Invoices</div>
             <div class="view-sub" id="invoices-sub">Live from Zoho Books</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Show detailed invoice analysis with aging and collection forecast')">Ask AI about Invoices →</button>
+          <button class="view-btn" onclick="APP.askQuick('Show detailed invoice analysis with aging and collection forecast')">Ask AI about Invoices</button>
         </div>
         <div class="view-body" id="invoices-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -279,10 +221,10 @@
       <div id="view-payments" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">💳 Payments</div>
+            <div class="view-title">Payments</div>
             <div class="view-sub" id="payments-sub">Customer &amp; vendor payments</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Summarize all payments and outstanding collections this month')">Ask AI about Payments →</button>
+          <button class="view-btn" onclick="APP.askQuick('Summarize all payments and outstanding collections this month')">Ask AI about Payments</button>
         </div>
         <div class="view-body" id="payments-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -291,10 +233,10 @@
       <div id="view-expenses" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">📋 Expenses</div>
+            <div class="view-title">Expenses</div>
             <div class="view-sub" id="expenses-sub">Expense management &amp; analysis</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Expense variance analysis and top categories this month')">Ask AI about Expenses →</button>
+          <button class="view-btn" onclick="APP.askQuick('Expense variance analysis and top categories this month')">Ask AI about Expenses</button>
         </div>
         <div class="view-body" id="expenses-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -303,10 +245,10 @@
       <div id="view-ap" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">📤 Accounts Payable</div>
+            <div class="view-title">Accounts Payable</div>
             <div class="view-sub" id="ap-sub">Vendor bills &amp; payables</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Show all overdue vendor bills and AP aging')">Ask AI about AP →</button>
+          <button class="view-btn" onclick="APP.askQuick('Show all overdue vendor bills and AP aging')">Ask AI about AP</button>
         </div>
         <div class="view-body" id="ap-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -315,10 +257,10 @@
       <div id="view-reports" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">📊 Financial Reports</div>
+            <div class="view-title">Financial Reports</div>
             <div class="view-sub">P&amp;L, Balance Sheet, Cash Flow</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Generate full financial report with P&L, Balance Sheet and Cash Flow commentary')">Ask AI for Full Report →</button>
+          <button class="view-btn" onclick="APP.askQuick('Generate full financial report with P&L, Balance Sheet and Cash Flow commentary')">Ask AI for Full Report</button>
         </div>
         <div class="view-body" id="reports-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -327,10 +269,10 @@
       <div id="view-intercompany" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">🔗 Intercompany</div>
+            <div class="view-title">Intercompany</div>
             <div class="view-sub">Cross-entity balances &amp; transactions</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('Show all intercompany balances, eliminations and related party disclosures')">Ask AI about Intercompany →</button>
+          <button class="view-btn" onclick="APP.askQuick('Show all intercompany balances, eliminations and related party disclosures')">Ask AI about Intercompany</button>
         </div>
         <div class="view-body" id="intercompany-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -339,10 +281,10 @@
       <div id="view-tax" class="view">
         <div class="view-header">
           <div>
-            <div class="view-title">💰 Tax &amp; Compliance</div>
+            <div class="view-title">Tax &amp; Compliance</div>
             <div class="view-sub">Tax obligations &amp; filing deadlines</div>
           </div>
-          <button class="view-btn" onclick="APP.askQuick('What are outstanding tax liabilities, GST filings due and tax provisions?')">Ask AI about Tax →</button>
+          <button class="view-btn" onclick="APP.askQuick('What are outstanding tax liabilities, GST filings due and tax provisions?')">Ask AI about Tax</button>
         </div>
         <div class="view-body" id="tax-body"><div class="view-loading">Loading…</div></div>
       </div>
@@ -351,7 +293,7 @@
 
     <!-- RIGHT SIDEBAR -->
     <aside id="sideR">
-      <div class="sl-section-label" id="snapshotLabel">📊 Snapshot</div>
+      <div class="sl-section-label" id="snapshotLabel">Snapshot</div>
       <div id="statCards"></div>
       <div class="side-divider"></div>
       <div class="sl-section-label">Quick Modules</div>
@@ -362,18 +304,12 @@
     </aside>
 
   </div>
-</div><!-- #app -->
+</div>
 
-<!-- Scripts -->
 <script src="js/orgs.js"></script>
 <script src="js/prompts.js"></script>
 <script src="js/renderer.js"></script>
 <script src="js/gemini.js"></script>
 <script src="js/app.js"></script>
-<script>
-  // Set OAuth redirect URI hint
-  const urlEl = document.getElementById("currentUrl");
-  if (urlEl) urlEl.textContent = window.location.href.split("?")[0].replace(/#.*$/, "");
-</script>
 </body>
 </html>

@@ -1,53 +1,84 @@
 # Hexa CoPilot — Finance Intelligence
 
-AI-powered CFO assistant for Hexamatics Group. Powered by Google Gemini + Zoho Books MCP.
+AI-powered CFO assistant for Hexamatics Group. Powered by OpenAI GPT-4o + Zoho Books.
 
-## Quick Start
+## Architecture
 
-1. Open `index.html` in a browser (Chrome/Edge recommended)
-2. Enter your Anthropic API key (`sk-ant-...`)
-3. Optionally enter Zoho Books Organisation IDs (comma-separated)
-4. Click **Connect & Launch** — or click **Try Demo Mode** to explore without an API key
+All credentials live **server-side** in Vercel environment variables. The browser
+only shows a login gate, then talks to our own `/api/*` proxies — it never holds
+or is asked for an API key or access token.
+
+```
+Browser ──► /api/zoho-proxy ──┐
+        ──► /api/ai-query  ──┼─► api/_zoho-auth.js ─► refreshes a Zoho access
+                              │   (reads ZOHO_* env)   token, caches it in memory
+                              └─► OpenAI (OPENAI_API_KEY env)
+```
+
+## Environment variables (Vercel → Project → Settings → Environment Variables)
+
+| Variable | Required | Notes |
+|---|---|---|
+| `OPENAI_API_KEY` | yes | GPT-4o key from platform.openai.com |
+| `ZOHO_CLIENT_ID` | yes | Zoho API console → **Server-based Application** client |
+| `ZOHO_CLIENT_SECRET` | yes | same client |
+| `ZOHO_REFRESH_TOKEN` | yes | minted once via `/api/zoho-setup` (below) |
+| `ZOHO_REGION` | no | data centre: `com` (default), `eu`, `in`, `au`, `jp`, `ca` |
+| `SETUP_SECRET` | temporary | any random string; gates `/api/zoho-setup`, remove after setup |
+
+Set all of them for the **Production** environment, then redeploy.
+
+## One-time Zoho refresh-token setup
+
+1. In the [Zoho API console](https://api-console.zoho.com), create a **Server-based
+   Application** client. Add this exact Authorized Redirect URI:
+   `https://<your-domain>/api/zoho-setup`
+2. Put `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REGION` and a throwaway
+   `SETUP_SECRET` in Vercel, and redeploy.
+3. Open `https://<your-domain>/api/zoho-setup?secret=<SETUP_SECRET>` in a browser.
+4. Click **Authorize with Zoho**, sign in as the Zoho user whose Books
+   organisations you want to expose.
+5. The page prints a `refresh_token`. Copy it into `ZOHO_REFRESH_TOKEN` in Vercel
+   and redeploy.
+6. Delete `SETUP_SECRET` (optional — the route is inert without a fresh Zoho code).
+
+The refresh token is long-lived; access tokens are refreshed automatically on
+each request and cached in the function's memory, so users are never prompted.
 
 ## File Structure
 
 ```
 hexa-copilot/
-├── index.html          # Main app shell
-├── css/
-│   └── style.css       # Full Hexa-branded stylesheet
+├── index.html          # App shell (login + main UI)
+├── css/style.css       # Hexa-branded stylesheet
 ├── js/
-│   ├── orgs.js         # 8 entity configurations (HSPL, PTHIT, HNPL...)
-│   ├── prompts.js      # Gemini system prompts per financial module
-│   ├── gemini.js       # AI engine: Anthropic API + Zoho Books MCP
+│   ├── orgs.js         # Builds entity list from Zoho org data
+│   ├── prompts.js      # System prompts per financial module
+│   ├── gemini.js       # Client: talks only to /api/* proxies (no keys)
 │   ├── renderer.js     # Response & module view renderer
-│   └── app.js          # Main application controller
-└── assets/
-    └── hexa-logo.png   # Hexa brand logo
+│   └── app.js          # Login gate + app controller
+└── api/
+    ├── _zoho-auth.js   # Shared: refresh-token → cached access token
+    ├── zoho-proxy.js   # Read-only Zoho Books REST proxy
+    ├── ai-query.js     # Server-side Zoho context fetch + OpenAI call
+    └── zoho-setup.js   # One-time refresh-token generator (SETUP_SECRET gated)
 ```
+
+## Login
+
+The app login is still a client-side gate (`js/app.js` → `ADMIN_USER` / `hx_users`
+in `localStorage`). It controls UI access only, not credentials. Move it to a
+server check if you need real auth.
 
 ## Features
 
-- **8 Entities** — HSPL, PTHIT, HNPL, HCI, HMCL, HTPL, HBL, HSSB
-- **AI Chat** — Natural language queries answered by Gemini with live Zoho Books data
+- **AI Chat** — natural-language queries answered by GPT-4o with live Zoho Books data
 - **Module Views** — Invoices, Payments, Expenses, AP/Bills, Reports, Intercompany, Tax
-- **Live Data** — Zoho Books MCP integration pulls real-time financial data
-- **Demo Mode** — Full app experience with realistic sample data (no API key needed)
-- **IFRS-aware** — Accounting treatment notes, IAS/IFRS references, audit-ready responses
-- **IPO-ready** — Intercompany disclosures, contingent liabilities, Bursa ACE awareness
+- **Live Data** — server-side Zoho Books REST integration
+- **IFRS-aware** — accounting treatment notes, IAS/IFRS references
+- **IPO-ready** — intercompany disclosures, contingent liabilities, Bursa ACE awareness
 
-## API Keys
+## Local development
 
-- **Anthropic API Key**: Get from https://console.anthropic.com
-- **Zoho Books Org IDs**: Found in Zoho Books → Settings → Organisation Profile
-- Keys are stored in memory only — never logged or transmitted
-
-## Deployment
-
-This is a static HTML app. Deploy by:
-- Uploading all files to any web server / hosting (Vercel, Netlify, S3)
-- Or simply opening `index.html` locally in Chrome
-
-## Security Note
-
-For production deployment, move the API key to a backend proxy to avoid exposing it in the browser.
+`vercel dev` runs the static site and the `/api/*` functions together. Put the
+same variables in a local `.env` (git-ignored) or use `vercel env pull`.
