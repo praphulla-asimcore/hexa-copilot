@@ -222,15 +222,27 @@ function buildPnlFacts(report) {
       if (name && Number.isFinite(amount)) target.push({ name, amount });
     });
   };
+  const sections = Array.isArray(report.profit_and_loss) ? report.profit_and_loss : [report];
+  sections.forEach(section => {
+    (section.account_transactions || []).forEach(group => {
+      const name = String(group.name || "").toLowerCase();
+      if (name.includes("operating income")) addAccounts(facts.income, group);
+      else if (name.includes("cost of goods sold")) addAccounts(facts.costOfGoodsSold, group);
+      else if (name.includes("operating expense")) addAccounts(facts.operatingExpenses, group);
+      else if (name.includes("non operating income")) addAccounts(facts.otherIncome, group);
+      else if (name.includes("non operating expense")) addAccounts(facts.otherExpenses, group);
+    });
+  });
   addAccounts(facts.income, report.income);
   addAccounts(facts.costOfGoodsSold, report.cost_of_goods_sold || report.costOfGoodsSold || report.cogs);
   addAccounts(facts.operatingExpenses, report.operating_expenses || report.operatingExpenses || report.expenses);
   addAccounts(facts.otherIncome, report.other_income || report.otherIncome);
   addAccounts(facts.otherExpenses, report.other_expenses || report.otherExpenses);
+  const sectionTotal = name => sections.find(section => String(section.name || "").toLowerCase() === name)?.total;
   [
-    ["revenue", report.income?.total ?? report.revenue],
-    ["costOfGoodsSold", report.cost_of_goods_sold?.total ?? report.costOfGoodsSold?.total ?? report.cogs?.total],
-    ["operatingExpenses", report.operating_expenses?.total ?? report.operatingExpenses?.total ?? report.expenses?.total],
+    ["revenue", report.income?.total ?? report.revenue ?? sections.find(section => String(section.name || "").toLowerCase() === "gross profit")?.account_transactions?.find(group => /operating income/i.test(group.name || ""))?.total],
+    ["costOfGoodsSold", report.cost_of_goods_sold?.total ?? report.costOfGoodsSold?.total ?? report.cogs?.total ?? sections.find(section => String(section.name || "").toLowerCase() === "gross profit")?.account_transactions?.find(group => /cost of goods sold/i.test(group.name || ""))?.total],
+    ["operatingExpenses", report.operating_expenses?.total ?? report.operatingExpenses?.total ?? report.expenses?.total ?? sections.find(section => String(section.name || "").toLowerCase() === "operating profit")?.account_transactions?.find(group => /operating expense/i.test(group.name || ""))?.total],
     ["grossProfit", report.gross_profit ?? report.grossProfit],
     ["operatingIncome", report.operating_income ?? report.operatingIncome],
     ["netProfitBeforeTax", report.net_profit_before_tax ?? report.netProfitBeforeTax],
@@ -239,6 +251,9 @@ function buildPnlFacts(report) {
     const amount = Number(value);
     if (Number.isFinite(amount)) facts.totals[key] = amount;
   });
+  if (facts.totals.grossProfit === undefined) facts.totals.grossProfit = sectionTotal("gross profit");
+  if (facts.totals.operatingIncome === undefined) facts.totals.operatingIncome = sectionTotal("operating profit");
+  if (facts.totals.netProfit === undefined) facts.totals.netProfit = sectionTotal("net profit/loss");
   return facts;
 }
 
