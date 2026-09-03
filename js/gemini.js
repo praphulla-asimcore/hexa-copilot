@@ -150,6 +150,7 @@ const GEMINI = {
           userMessage,
           orgContext,
           conversationHistory, // pass prior turns for follow-up context
+          debug: getSession()?.role === "admin",
         }),
       });
     } catch (e) {
@@ -160,11 +161,11 @@ const GEMINI = {
     if (res.status === 503 || data.code === "server_not_configured")
       throw new Error(data.error || "Server is not configured.");
     if (!res.ok || data.error) throw new Error(data.error || `AI error ${res.status}`);
-    return this._parseResponse(data.content || "");
+    return this._parseResponse(data.content || "", data.debug || null);
   },
 
   // ── PARSE OPENAI RESPONSE ───────────────────────────────────────────
-  _parseResponse(raw) {
+  _parseResponse(raw, debug = null) {
     try {
       const parsed = JSON.parse(raw.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
       return {
@@ -173,10 +174,12 @@ const GEMINI = {
         tableRows:      parsed.tableRows      || null,
         alerts:         parsed.alerts         || [],
         accountingNote: parsed.accountingNote || null,
-        source: "live"
+        source: "live",
+        sourceRecords: debug?.sourceRecords || parsed.sourceRecords || [],
+        debug,
       };
     } catch (_) {
-      return { html: raw || "<em>Response received.</em>", tableTitle: null, tableRows: null, alerts: [], accountingNote: null, source: "live" };
+      return { html: raw || "<em>Response received.</em>", tableTitle: null, tableRows: null, alerts: [], accountingNote: null, source: "live", sourceRecords: [], debug };
     }
   },
 };

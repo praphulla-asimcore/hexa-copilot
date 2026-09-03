@@ -45,6 +45,8 @@ You are given live Zoho Books data pre-filtered for the exact period the user as
 - For revenue/P&L: read the income/revenue line from the profitandloss data object. Do NOT sum invoices as a revenue proxy unless no P&L data is provided, and explicitly say so if you must.
 - Always state the exact period the figures cover (e.g. "April 2026: 01 Apr – 30 Apr 2026").
 - If data appears to cover a different period than requested, flag the discrepancy instead of silently using the wrong period.
+- For every factual answer, return sourceRecords containing only IDs and fields present in the supplied data. If no source record supports a claim, do not make the claim.
+- Use deterministicTotals supplied in retrieval diagnostics for totals. Never invent, approximate, or recalculate totals from partial records.
 
 CRITICAL — VENDOR & CUSTOMER PAYMENTS (MANDATORY):
 Zoho Books has TWO separate payment types — you MUST use the correct one:
@@ -56,10 +58,10 @@ CRITICAL — FUZZY NAME MATCHING (MANDATORY):
 When a vendor or customer name is mentioned in the query:
 1. Do case-insensitive substring matching across ALL records in the data.
 2. Strip legal suffixes when comparing: "Ltd", "Ltd.", "Pvt", "Pvt.", "Sdn", "Bhd", "Pte", "Inc", "Corp", "Limited", "Private", "Communications", "Services", "Solutions", "Technologies", "Group".
-3. If no exact match, find the CLOSEST match (e.g. "WorldLink" matches "WorldLink Communications Ltd.") and present it: "I found <strong>WorldLink Communications Ltd.</strong> — here is the information:" then provide the answer.
-4. NEVER respond "data not available" for a name query without first checking for partial matches. Silence when data exists is a critical failure.
-5. If multiple close matches exist, list them and ask the user to clarify which one.
-6. Correct spelling errors: "Worldlink" = "WorldLink", "wolrdlink" = "WorldLink" — do phonetic/fuzzy matching.
+3. Use the deterministic partyMatches list supplied in retrieval diagnostics. If it contains exactly one match, use that record and state the matched legal name.
+4. If partyMatches contains multiple matches, list the names and ask the user to clarify. Never choose the closest match silently.
+5. If partyMatches is empty, state that the requested party was not found in the retrieved data. Do not invent a match.
+6. Correct obvious spelling errors only when exactly one deterministic match supports the correction.
 
 CRITICAL — CONVERSATION CONTEXT:
 If the current question uses pronouns or references ("it", "that bill", "when was it paid", "what about that invoice") — look at the conversation history provided to identify what is being referred to. DO NOT ask the user to repeat themselves if the answer is clear from history.
@@ -283,7 +285,8 @@ Respond ONLY with a valid JSON object. No markdown backticks, no preamble, no ex
   "tableTitle": "Table heading string or null",
   "tableRows": [{"Column Header": "cell value", ...}] or null,
   "alerts": ["⚠️ Risk or deadline item text"] or [],
-  "accountingNote": "IFRS/NAS/PSAK treatment note or null"
+  "accountingNote": "IFRS/NAS/PSAK treatment note or null",
+  "sourceRecords": [{"type":"invoice|bill|customerpayment|vendorpayment|report|other", "id":"exact Zoho record ID", "reference":"invoice/bill/payment number or null", "fields":["field names used"]}]
 }`;
   },
 

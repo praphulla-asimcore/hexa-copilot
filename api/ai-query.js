@@ -95,19 +95,120 @@ function parseDateRange(query, wideSearch = false) {
 // The leading (token, region) args are retained for call-site compatibility but
 // ignored — auth and data centre are resolved server-side from env vars.
 async function zohoGet(_token, _region, path, params={}) {
-  const { json } = await zohoBooksGet(path, params);
+  const { status, json } = await zohoBooksGet(path, params);
+  if (status >= 400 || json?._nonJson !== undefined || (json?.code !== undefined && json.code !== 0)) {
+    throw new Error(`${path}: ${json?.message || json?.error || `HTTP ${status}`}`);
+  }
   return json && json._nonJson !== undefined ? {} : (json || {});
 }
 
-async function zohoGetPaged(_token, _region, path, params, rootKey) {
+async function zohoGetPaged(_token, _region, path, params, rootKey, maxPages = 5) {
   const all = [];
-  for (let page=1; page<=5; page++) {
+  for (let page=1; page<=maxPages; page++) {
     const data = await zohoGet(null, null, path, { ...params, page, per_page:200 });
     const items = data[rootKey] || [];
     all.push(...items);
     if (!data.page_context?.has_more_page) break;
   }
   return all;
+}
+
+function extractRecordReferences(query) {
+  const references = {};
+  const patterns = [
+    ["invoices", /\binvoice(?:\s*(?:number|no\.?|#))?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]{2,})/i],
+    ["bills", /\bbill(?:\s*(?:number|no\.?|#))?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]{2,})/i],
+    ["customerpayments", /\b(?:customer\s+)?payment(?:\s*(?:number|no\.?|#))?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]{2,})/i],
+    ["vendorpayments", /\bvendor\s+payment(?:\s*(?:number|no\.?|#))?\s*[:#-]?\s*([A-Z0-9][A-Z0-9/_-]{2,})/i],
+  ];
+  patterns.forEach(([type, pattern]) => {
+    const match = query.match(pattern);
+    if (match) references[type] = match[1].toLowerCase();
+  });
+  return references;
+}
+
+function recordMatchesReference(record, reference) {
+  return [record.invoice_number, record.bill_number, record.payment_number, record.reference_number]
+    .filter(Boolean)
+    .some(value => String(value).toLowerCase() === reference);
+}
+
+function buildSourceRecords(data) {
+  const sourceRecords = [];
+  Object.entries(data).forEach(([type, records]) => {
+    if (!Array.isArray(records)) return;
+    records.forEach(record => {
+      const id = record.invoice_id || record.bill_id || record.payment_id || record.expense_id || record.journal_id || record.contact_id || null;
+      if (!id) return;
+      sourceRecords.push({
+        type: type.replace(/^exact_/, "").replace(/s$/, ""),
+        id,
+        reference: record.invoice_number || record.bill_number || record.payment_number || record.reference_number || null,
+        fields: Object.keys(record),
+      });
+    });
+  });
+  return sourceRecords;
+}
+
+function buildDeterministicTotals(data) {
+  const totals = {};
+  const amountFields = {
+    invoices: "balance", bills: "balance", customerpayments: "amount",
+    vendorpayments: "amount", expenses: "total",
+  };
+  Object.entries(amountFields).forEach(([type, field]) => {
+    const records = data[type];
+    if (!Array.isArray(records)) return;
+    totals[type] = {};
+    records.forEach(record => {
+      const currency = record.currency_code || "UNKNOWN";
+      const amount = Number(record[field] || 0);
+      if (Number.isFinite(amount)) totals[type][currency] = (totals[type][currency] || 0) + amount;
+    });
+  });
+  return totals;
+}
+
+function buildPaymentLinks(data) {
+  const links = [];
+  ["customerpayments", "vendorpayments"].forEach(type => {
+    (data[type] || []).forEach(payment => {
+      (payment.invoices || payment.bills || []).forEach(link => {
+        links.push({
+          paymentType: type,
+          paymentId: payment.payment_id || null,
+          paymentNumber: payment.payment_number || null,
+          recordId: link.invoice_id || link.bill_id || null,
+          recordReference: link.invoice_number || link.bill_number || null,
+          amountApplied: Number(link.amount_applied || 0),
+          currency: payment.currency_code || null,
+        });
+      });
+    });
+  });
+  return links;
+}
+
+function resolvePartyMatches(data, query) {
+  const nameMatch = query.match(/\b(?:vendor|supplier|customer|client)\s+(?:named\s+)?["']?([A-Za-z][A-Za-z0-9 .&'-]{1,60}?)["']?(?:\s+(?:invoice|bill|payment|paid|balance|amount|date|list|details|status)|[?,.]|$)/i);
+  if (!nameMatch) return [];
+  const requested = nameMatch[1].trim().toLowerCase().replace(/\s+/g, " ");
+  const matches = new Map();
+  Object.values(data).forEach(records => {
+    if (!Array.isArray(records)) return;
+    records.forEach(record => {
+      const names = [record.vendor_name, record.customer_name, record.contact_name].filter(Boolean);
+      names.forEach(name => {
+        const normalized = String(name).toLowerCase().replace(/\b(ltd|pvt|sdn|bhd|pte|inc|corp|limited|private|communications|services|solutions|technologies|group)\b\.?/g, "").replace(/\s+/g, " ").trim();
+        if (normalized === requested || normalized.includes(requested) || requested.includes(normalized)) {
+          matches.set(String(name), { name: String(name), id: record.vendor_id || record.customer_id || record.contact_id || null });
+        }
+      });
+    });
+  });
+  return [...matches.values()];
 }
 
 // ── FULL ZOHO CONTEXT FETCHER ─────────────────────────────────────────
@@ -122,6 +223,12 @@ async function fetchZohoContext(token, region, orgId, query) {
   const dpL = { ...rp, date_start:dr.from, date_end:dr.to, sort_column:"date", sort_order:"D" };
 
   const tasks = [];
+  const exactReferences = extractRecordReferences(query);
+  Object.entries(exactReferences).forEach(([endpoint, reference]) => {
+    const rootKey = endpoint;
+    tasks.unshift(() => zohoGetPaged(token, region, endpoint, { ...dpL, sort_column:"date", sort_order:"D" }, rootKey, 50)
+      .then(records => ({ [`exact_${endpoint}`]: records.filter(record => recordMatchesReference(record, reference)) })));
+  });
 
   // ── FINANCIAL REPORTS ────────────────────────────────────────────────
   if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover|pbt|pat/.test(q))
@@ -282,14 +389,39 @@ async function fetchZohoContext(token, region, orgId, query) {
     );
   }
 
-  // Run up to 5 tasks in parallel (well within 60s timeout)
-  const limited = tasks.slice(0, 5);
-  const results = await Promise.allSettled(limited.map(fn => fn()));
+  // Run every selected task so a matching query cannot silently lose its relevant endpoint.
+  const results = await Promise.allSettled(tasks.map(fn => fn()));
   const combined = { _query_period: dr };
-  results.forEach(r => { if (r.status === "fulfilled") Object.assign(combined, r.value); });
+  const debug = {
+    period: dr,
+    exactReferences,
+    endpoints: [],
+    recordCounts: {},
+    errors: [],
+  };
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      Object.assign(combined, result.value);
+      Object.keys(result.value).filter(key => !key.startsWith("_")).forEach(key => {
+        debug.endpoints.push(key);
+        const value = result.value[key];
+        debug.recordCounts[key] = Array.isArray(value) ? value.length : (value && typeof value === "object" ? Object.keys(value).length : 1);
+      });
+    } else {
+      debug.errors.push({ task: index + 1, message: result.reason?.message || "Unknown data fetch error" });
+    }
+  });
+  debug.endpoints = [...new Set(debug.endpoints)];
+  debug.sourceRecords = buildSourceRecords(combined);
+  debug.deterministicTotals = buildDeterministicTotals(combined);
+  debug.paymentLinks = buildPaymentLinks(combined);
+  debug.partyMatches = resolvePartyMatches(combined, query);
 
   const json = JSON.stringify(combined, null, 2);
-  return json.length > 80000 ? json.substring(0, 80000) + "\n...[truncated]" : json;
+  return {
+    json: json.length > 80000 ? json.substring(0, 80000) + "\n...[truncated]" : json,
+    debug: { ...debug, truncated: json.length > 80000 },
+  };
 }
 
 // ── HANDLER ───────────────────────────────────────────────────────────
@@ -302,7 +434,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST")   return res.status(405).json({ error: "Method not allowed" });
 
   const {
-    orgId, systemPrompt, userMessage, orgContext, conversationHistory,
+    orgId, systemPrompt, userMessage, orgContext, conversationHistory, debug: debugRequested,
   } = req.body || {};
 
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -313,8 +445,13 @@ module.exports = async function handler(req, res) {
 
   let zohoData = null;
   let dr = parseDateRange(userMessage, /\blast\b|\bwhen\b|\bmost.?recent\b|\bever\b|\bhistory\b|\ball.?time\b|\brecord\b/.test(userMessage.toLowerCase()));
+  let retrievalDebug = { period: dr, endpoints: [], recordCounts: {}, errors: [] };
   if (zohoConfigured() && orgId) {
-    try { zohoData = await fetchZohoContext(null, null, orgId, userMessage); }
+    try {
+      const result = await fetchZohoContext(null, null, orgId, userMessage);
+      zohoData = result.json;
+      retrievalDebug = result.debug;
+    }
     catch (e) { console.error("Zoho fetch error:", e.message); }
   }
 
@@ -322,8 +459,9 @@ module.exports = async function handler(req, res) {
     ? [
         `DATA PERIOD: ${dr.label} (${dr.from} to ${dr.to})`,
         `PAYMENT TYPES: vendorpayments=money paid OUT to vendors; customerpayments=money received IN from customers.`,
-        `LIVE ZOHO BOOKS DATA:\n${zohoData}`,
-        `RULES: (1) Only use figures explicitly in the data. (2) Fuzzy-match vendor/customer names — strip Ltd/Pvt/Sdn/Bhd/Pte/Inc suffixes. (3) Check vendorpayments for "paid to vendor" questions. (4) Use conversation history for follow-up pronouns. (5) Use each record's currency_code, never the org currency on foreign transactions.`,
+        `LIVE FINANCIAL DATA:\n${zohoData}`,
+        `RETRIEVAL DIAGNOSTICS:\n${JSON.stringify(retrievalDebug)}`,
+        `RULES: (1) Only use figures explicitly in the data. (2) Use deterministicTotals for totals; do not calculate totals yourself. (3) Never select a closest match when multiple records are possible; ask the user to clarify. (4) Check vendorpayments for "paid to vendor" questions. (5) Use conversation history for follow-up pronouns. (6) Use each record's currency_code, never the org currency on foreign transactions. (7) If retrieval diagnostics show errors, missing endpoints, zero exact matches, or truncation, disclose the limitation and do not guess.`,
       ].join("\n")
     : "(Zoho data unavailable.)";
 
@@ -355,7 +493,7 @@ ${COMPANY_POLICY}`,
       return res.status(aiRes.status).json({ error: err.error?.message || `OpenAI error ${aiRes.status}` });
     }
     const data = await aiRes.json();
-    return res.status(200).json({ content: data.choices?.[0]?.message?.content || "" });
+    return res.status(200).json({ content: data.choices?.[0]?.message?.content || "", debug: debugRequested ? retrievalDebug : null });
   } catch (e) {
     return res.status(502).json({ error: "AI request failed: " + e.message });
   }

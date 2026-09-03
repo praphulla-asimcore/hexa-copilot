@@ -24,6 +24,20 @@ const RENDERER = {
       });
     }
 
+    if (result.sourceRecords && result.sourceRecords.length > 0) {
+      html += `<div class="src-tag">Sources: ${result.sourceRecords.map(source => `${source.type} ${source.reference || source.id}`).join(", ")}</div>`;
+    }
+
+    if (result.debug) {
+      html += `<details class="debug-panel"><summary>Retrieval details</summary>
+        <div>Period: ${result.debug.period?.from || "?"} to ${result.debug.period?.to || "?"}</div>
+        <div>Endpoints: ${(result.debug.endpoints || []).join(", ") || "none"}</div>
+        <div>Records: ${Object.entries(result.debug.recordCounts || {}).map(([key, count]) => `${key}=${count}`).join(", ") || "none"}</div>
+        <div>Source IDs: ${(result.debug.sourceRecords || []).map(source => source.id).join(", ") || "none"}</div>
+        ${(result.debug.errors || []).length ? `<div class="debug-error">Errors: ${result.debug.errors.map(error => error.message).join("; ")}</div>` : ""}
+      </details>`;
+    }
+
     html += `<div class="src-tag">Live financial data</div>`;
     html += `</div>`;
     return html;

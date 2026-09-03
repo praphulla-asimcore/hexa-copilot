@@ -675,6 +675,9 @@ table.vt { font-size: 12.5px; }
 .user-list-role { color: var(--accent); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; }
 .user-resend-btn { background: transparent; border: 1px solid var(--border-2); border-radius: var(--r-xs); color: var(--text-s); cursor: pointer; font-size: 10px; padding: 4px 7px; }
 .user-resend-btn:hover { border-color: var(--accent-line); color: var(--text); }
+.debug-panel { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-xs); color: var(--muted); font-size: 10.5px; line-height: 1.6; }
+.debug-panel summary { color: var(--text-s); cursor: pointer; font-weight: 600; }
+.debug-error { color: var(--red); }
 
 /* ── LOGIN PAGE ────────────────────────────────────────────────── */
 #loginPage {
