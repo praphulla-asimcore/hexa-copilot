@@ -176,6 +176,7 @@ const GEMINI = {
         accountingNote: parsed.accountingNote || null,
         source: "live",
         sourceRecords: debug?.sourceRecords || parsed.sourceRecords || [],
+        deterministicFacts: debug?.profitAndLossFacts || null,
         debug,
       };
     } catch (_) {

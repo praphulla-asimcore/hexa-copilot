@@ -210,6 +210,38 @@ function buildDeterministicAging(data, asOfDate) {
   return aging;
 }
 
+function buildPnlFacts(report) {
+  if (!report || typeof report !== "object") return null;
+  const facts = { income: [], costOfGoodsSold: [], operatingExpenses: [], otherIncome: [], otherExpenses: [], totals: {} };
+  const addAccounts = (target, value) => {
+    const accounts = Array.isArray(value) ? value : value?.accounts;
+    if (!Array.isArray(accounts)) return;
+    accounts.forEach(account => {
+      const name = account.name || account.account_name || account.accountName;
+      const amount = Number(account.total ?? account.amount ?? account.balance);
+      if (name && Number.isFinite(amount)) target.push({ name, amount });
+    });
+  };
+  addAccounts(facts.income, report.income);
+  addAccounts(facts.costOfGoodsSold, report.cost_of_goods_sold || report.costOfGoodsSold || report.cogs);
+  addAccounts(facts.operatingExpenses, report.operating_expenses || report.operatingExpenses || report.expenses);
+  addAccounts(facts.otherIncome, report.other_income || report.otherIncome);
+  addAccounts(facts.otherExpenses, report.other_expenses || report.otherExpenses);
+  [
+    ["revenue", report.income?.total ?? report.revenue],
+    ["costOfGoodsSold", report.cost_of_goods_sold?.total ?? report.costOfGoodsSold?.total ?? report.cogs?.total],
+    ["operatingExpenses", report.operating_expenses?.total ?? report.operatingExpenses?.total ?? report.expenses?.total],
+    ["grossProfit", report.gross_profit ?? report.grossProfit],
+    ["operatingIncome", report.operating_income ?? report.operatingIncome],
+    ["netProfitBeforeTax", report.net_profit_before_tax ?? report.netProfitBeforeTax],
+    ["netProfit", report.net_profit ?? report.netProfit],
+  ].forEach(([key, value]) => {
+    const amount = Number(value);
+    if (Number.isFinite(amount)) facts.totals[key] = amount;
+  });
+  return facts;
+}
+
 function resolvePartyMatches(data, query) {
   const nameMatch = query.match(/\b(?:vendor|supplier|customer|client)\s+(?:named\s+)?["']?([A-Za-z][A-Za-z0-9 .&'-]{1,60}?)["']?(?:\s+(?:invoice|bill|payment|paid|balance|amount|date|list|details|status)|[?,.]|$)/i);
   if (!nameMatch) return [];
@@ -237,6 +269,7 @@ async function fetchZohoContext(token, region, orgId, query) {
 
   const needsWide = /\blast\b|\bwhen\b|\bmost.?recent\b|\bever\b|\bhistory\b|\ball.?time\b|\brecord\b/.test(q);
   const dr = parseDateRange(query, needsWide);
+  const isPnlExpenseQuery = /p&l|profit.?and.?loss|income statement/.test(q) && /expense|cost|spend|overhead/.test(q);
 
   const dpR = { ...rp, from_date:dr.from, to_date:dr.to, cash_based:false };
   const dpL = { ...rp, date_start:dr.from, date_end:dr.to, sort_column:"date", sort_order:"D" };
@@ -356,7 +389,7 @@ async function fetchZohoContext(token, region, orgId, query) {
     tasks.push(() => zohoGetPaged(token,region,"purchaseorders",dpL,"purchaseorders").then(r=>({purchaseorders:r,_period:dr.label})));
 
   // ── EXPENSES ────────────────────────────────────────────────────────
-  if (/expense|cost|spend|overhead|reimburs/.test(q))
+  if (/expense|cost|spend|overhead|reimburs/.test(q) && !isPnlExpenseQuery)
     tasks.push(() => zohoGetPaged(token,region,"expenses",dpL,"expenses").then(r=>({expenses:r,_period:dr.label})));
 
   // ── RECURRING EXPENSES ───────────────────────────────────────────────
@@ -435,6 +468,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   debug.deterministicTotals = buildDeterministicTotals(combined);
   debug.paymentLinks = buildPaymentLinks(combined);
   debug.deterministicAging = buildDeterministicAging(combined, dr.to);
+  debug.profitAndLossFacts = buildPnlFacts(combined.profitandloss);
   debug.partyMatches = resolvePartyMatches(combined, query);
 
   const json = JSON.stringify(combined, null, 2);
