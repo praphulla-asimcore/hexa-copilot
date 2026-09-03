@@ -265,6 +265,12 @@ function buildSalaryFacts(report) {
   return { accounts, total: accounts.reduce((sum, account) => sum + account.amount, 0) };
 }
 
+function buildSalesFacts(report) {
+  const facts = buildPnlFacts(report);
+  if (!facts) return null;
+  return { total: facts.totals.revenue ?? null, accounts: facts.income };
+}
+
 function resolvePartyMatches(data, query) {
   const nameMatch = query.match(/\b(?:vendor|supplier|customer|client)\s+(?:named\s+)?["']?([A-Za-z][A-Za-z0-9 .&'-]{1,60}?)["']?(?:\s+(?:invoice|bill|payment|paid|balance|amount|date|list|details|status)|[?,.]|$)/i);
   if (!nameMatch) return [];
@@ -294,6 +300,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   const dr = parseDateRange(query, needsWide);
   const isPnlExpenseQuery = /p&l|profit.?and.?loss|income statement/.test(q) && /expense|cost|spend|overhead/.test(q);
   const isSalaryQuery = /salary|salaries|wage|wages|payroll|remuneration|employee compensation|staff cost|personnel cost/.test(q);
+  const isSalesQuery = /\bsales?\b|\brevenue\b|\bturnover\b/.test(q);
 
   const dpR = { ...rp, from_date:dr.from, to_date:dr.to, cash_based:false };
   const dpL = { ...rp, date_start:dr.from, date_end:dr.to, sort_column:"date", sort_order:"D" };
@@ -307,7 +314,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   });
 
   // ── FINANCIAL REPORTS ────────────────────────────────────────────────
-  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover|pbt|pat/.test(q) || isSalaryQuery)
+  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover|pbt|pat/.test(q) || isSalaryQuery || isSalesQuery)
     tasks.push(() => zohoGet(token,region,"reports/profitandloss",dpR).then(d=>({profitandloss:d,_period:dr.label})));
 
   if (/balance.?sheet|asset|liabilit|equity|net.?worth|book.?value/.test(q))
@@ -457,7 +464,7 @@ async function fetchZohoContext(token, region, orgId, query) {
     tasks.push(() => zohoGet(token,region,"reports/taxsummary",dpR).then(d=>({taxsummary:d,_period:dr.label})));
 
   // ── FALLBACK ─────────────────────────────────────────────────────────
-  if (!tasks.length && !isSalaryQuery) {
+  if (!tasks.length && !isSalaryQuery && !isSalesQuery) {
     tasks.push(
       () => zohoGet(token,region,"invoices",    {...rp,status:"unpaid",per_page:200}).then(d=>({invoices:d})),
       () => zohoGet(token,region,"bills",       {...rp,status:"unpaid",per_page:200}).then(d=>({bills:d})),
@@ -494,6 +501,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   debug.deterministicAging = buildDeterministicAging(combined, dr.to);
   debug.profitAndLossFacts = buildPnlFacts(combined.profitandloss);
   debug.salaryFacts = buildSalaryFacts(combined.profitandloss);
+  debug.salesFacts = buildSalesFacts(combined.profitandloss);
   debug.partyMatches = resolvePartyMatches(combined, query);
 
   const json = JSON.stringify(combined, null, 2);
@@ -526,6 +534,7 @@ module.exports = async function handler(req, res) {
   let dr = parseDateRange(userMessage, /\blast\b|\bwhen\b|\bmost.?recent\b|\bever\b|\bhistory\b|\ball.?time\b|\brecord\b/.test(userMessage.toLowerCase()));
   const queryLower = userMessage.toLowerCase();
   const isSalaryQuery = /salary|salaries|wage|wages|payroll|remuneration|employee compensation|staff cost|personnel cost/.test(queryLower);
+  const isSalesQuery = /\bsales?\b|\brevenue\b|\bturnover\b/.test(queryLower);
   const isPolicyQuery = /policy|procedure|approval|risk|compliance|control|governance|incident|cybersecurity|password|firewall|backup|whistleblow/.test(queryLower);
   let retrievalDebug = { period: dr, endpoints: [], recordCounts: {}, errors: [] };
   if (zohoConfigured() && orgId) {
@@ -539,6 +548,8 @@ module.exports = async function handler(req, res) {
 
   const modelData = isSalaryQuery
     ? JSON.stringify({ period: dr, profitAndLossFacts: retrievalDebug.profitAndLossFacts, salaryFacts: retrievalDebug.salaryFacts })
+    : isSalesQuery
+      ? JSON.stringify({ period: dr, profitAndLossFacts: retrievalDebug.profitAndLossFacts, salesFacts: retrievalDebug.salesFacts })
     : zohoData;
   const dataBlock = modelData
     ? [
