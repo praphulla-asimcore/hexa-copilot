@@ -49,6 +49,7 @@ You are given live Zoho Books data pre-filtered for the exact period the user as
 - Use deterministicTotals supplied in retrieval diagnostics for totals. Never invent, approximate, or recalculate totals from partial records.
 - When the user asks for P&L expense items, use only profitAndLossFacts.operatingExpenses and the operating expense account lines in profitandloss. Do not use expenses[] transaction records as a substitute, and do not include COGS unless the user explicitly asks for it.
 - For P&L expense items, list each account name and the exact amount supplied. Preserve the report sign convention and state the report period.
+- For salary, wages, or payroll questions, use only salaryFacts.accounts and the matching P&L account lines. Do not use invoices, bills, bank balances, customer payments, or unrelated expense transactions. If salaryFacts.accounts is empty, say that no salary/wage/payroll account was found in the selected P&L data and ask whether the user wants a different period or entity.
 
 CRITICAL — VENDOR & CUSTOMER PAYMENTS (MANDATORY):
 Zoho Books has TWO separate payment types — you MUST use the correct one:
@@ -343,6 +344,18 @@ When queried about expenses, provide:
 - Month-over-month trend`;
   },
 
+  salary(org) {
+    return `${PROMPTS.base(org)}
+
+MODULE CONTEXT — SALARY / PAYROLL EXPENSE:
+When the user asks about salary, wages, payroll, staff costs, or employee compensation:
+- Read only the salaryFacts.accounts and matching operating expense or cost-of-goods-sold account lines from the P&L report.
+- Show one clearly labeled total salary-related expense, followed by the exact supporting account names and amounts.
+- Do not list every amount in the P&L. Exclude revenue, invoices, bills, cash, bank balances, vendor payments, customer payments, tax totals, and unrelated expenses.
+- If no matching account exists, state that salary data is not available in the selected P&L period and ask for the required period or entity. Never substitute another figure.
+- State whether the figure is an expense incurred in the P&L period, not a payroll register or employee-by-employee salary total. If a payroll register is required, say that the current finance data does not contain it.`;
+  },
+
   ap(org) {
     return `${PROMPTS.base(org)}
 
@@ -414,6 +427,8 @@ When queried about tax, provide:
   forQuery(org, userQuery) {
     // Route to module-specific prompt based on keywords
     const q = userQuery.toLowerCase();
+    if (q.includes('salary') || q.includes('salaries') || q.includes('wage') || q.includes('wages') || q.includes('payroll') || q.includes('remuneration') || q.includes('employee compensation') || q.includes('staff cost') || q.includes('personnel cost'))
+      return PROMPTS.salary(org);
     if (q.includes('invoice') || q.includes('ar ') || q.includes('receivable') || q.includes('aging'))
       return PROMPTS.invoices(org);
     if (q.includes('payment') || q.includes('receipt') || q.includes('collect'))

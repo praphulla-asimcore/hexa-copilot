@@ -242,6 +242,14 @@ function buildPnlFacts(report) {
   return facts;
 }
 
+function buildSalaryFacts(report) {
+  const facts = buildPnlFacts(report);
+  if (!facts) return null;
+  const salaryPattern = /salary|salaries|wage|wages|payroll|employee compensation|staff cost|staff expense|personnel cost|personnel expense|remuneration/i;
+  const accounts = [...facts.operatingExpenses, ...facts.costOfGoodsSold].filter(account => salaryPattern.test(account.name));
+  return { accounts, total: accounts.reduce((sum, account) => sum + account.amount, 0) };
+}
+
 function resolvePartyMatches(data, query) {
   const nameMatch = query.match(/\b(?:vendor|supplier|customer|client)\s+(?:named\s+)?["']?([A-Za-z][A-Za-z0-9 .&'-]{1,60}?)["']?(?:\s+(?:invoice|bill|payment|paid|balance|amount|date|list|details|status)|[?,.]|$)/i);
   if (!nameMatch) return [];
@@ -270,6 +278,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   const needsWide = /\blast\b|\bwhen\b|\bmost.?recent\b|\bever\b|\bhistory\b|\ball.?time\b|\brecord\b/.test(q);
   const dr = parseDateRange(query, needsWide);
   const isPnlExpenseQuery = /p&l|profit.?and.?loss|income statement/.test(q) && /expense|cost|spend|overhead/.test(q);
+  const isSalaryQuery = /salary|salaries|wage|wages|payroll|remuneration|employee compensation|staff cost|personnel cost/.test(q);
 
   const dpR = { ...rp, from_date:dr.from, to_date:dr.to, cash_based:false };
   const dpL = { ...rp, date_start:dr.from, date_end:dr.to, sort_column:"date", sort_order:"D" };
@@ -283,7 +292,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   });
 
   // ── FINANCIAL REPORTS ────────────────────────────────────────────────
-  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover|pbt|pat/.test(q))
+  if (/p&l|profit|loss|revenue|income|ebitda|margin|turnover|pbt|pat/.test(q) || isSalaryQuery)
     tasks.push(() => zohoGet(token,region,"reports/profitandloss",dpR).then(d=>({profitandloss:d,_period:dr.label})));
 
   if (/balance.?sheet|asset|liabilit|equity|net.?worth|book.?value/.test(q))
@@ -433,7 +442,7 @@ async function fetchZohoContext(token, region, orgId, query) {
     tasks.push(() => zohoGet(token,region,"reports/taxsummary",dpR).then(d=>({taxsummary:d,_period:dr.label})));
 
   // ── FALLBACK ─────────────────────────────────────────────────────────
-  if (!tasks.length) {
+  if (!tasks.length && !isSalaryQuery) {
     tasks.push(
       () => zohoGet(token,region,"invoices",    {...rp,status:"unpaid",per_page:200}).then(d=>({invoices:d})),
       () => zohoGet(token,region,"bills",       {...rp,status:"unpaid",per_page:200}).then(d=>({bills:d})),
@@ -469,6 +478,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   debug.paymentLinks = buildPaymentLinks(combined);
   debug.deterministicAging = buildDeterministicAging(combined, dr.to);
   debug.profitAndLossFacts = buildPnlFacts(combined.profitandloss);
+  debug.salaryFacts = buildSalaryFacts(combined.profitandloss);
   debug.partyMatches = resolvePartyMatches(combined, query);
 
   const json = JSON.stringify(combined, null, 2);
