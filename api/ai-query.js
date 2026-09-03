@@ -509,6 +509,9 @@ module.exports = async function handler(req, res) {
 
   let zohoData = null;
   let dr = parseDateRange(userMessage, /\blast\b|\bwhen\b|\bmost.?recent\b|\bever\b|\bhistory\b|\ball.?time\b|\brecord\b/.test(userMessage.toLowerCase()));
+  const queryLower = userMessage.toLowerCase();
+  const isSalaryQuery = /salary|salaries|wage|wages|payroll|remuneration|employee compensation|staff cost|personnel cost/.test(queryLower);
+  const isPolicyQuery = /policy|procedure|approval|risk|compliance|control|governance|incident|cybersecurity|password|firewall|backup|whistleblow/.test(queryLower);
   let retrievalDebug = { period: dr, endpoints: [], recordCounts: {}, errors: [] };
   if (zohoConfigured() && orgId) {
     try {
@@ -519,11 +522,14 @@ module.exports = async function handler(req, res) {
     catch (e) { console.error("Zoho fetch error:", e.message); }
   }
 
-  const dataBlock = zohoData
+  const modelData = isSalaryQuery
+    ? JSON.stringify({ period: dr, profitAndLossFacts: retrievalDebug.profitAndLossFacts, salaryFacts: retrievalDebug.salaryFacts })
+    : zohoData;
+  const dataBlock = modelData
     ? [
         `DATA PERIOD: ${dr.label} (${dr.from} to ${dr.to})`,
         `PAYMENT TYPES: vendorpayments=money paid OUT to vendors; customerpayments=money received IN from customers.`,
-        `LIVE FINANCIAL DATA:\n${zohoData}`,
+        `LIVE FINANCIAL DATA:\n${modelData}`,
         `RETRIEVAL DIAGNOSTICS:\n${JSON.stringify(retrievalDebug)}`,
         `RULES: (1) Only use figures explicitly in the data. (2) Use deterministicTotals for totals; do not calculate totals yourself. (3) Never select a closest match when multiple records are possible; ask the user to clarify. (4) Check vendorpayments for "paid to vendor" questions. (5) Use conversation history for follow-up pronouns. (6) Use each record's currency_code, never the org currency on foreign transactions. (7) If retrieval diagnostics show errors, missing endpoints, zero exact matches, or truncation, disclose the limitation and do not guess.`,
       ].join("\n")
@@ -531,12 +537,12 @@ module.exports = async function handler(req, res) {
 
   const messages = [{
     role:"system",
-    content: `${systemPrompt}
+    content: `${systemPrompt}${isPolicyQuery ? `
 
 COMPANY POLICY KNOWLEDGE BASE:
 Use the following approved company policy when answering questions about internal rules, approvals, responsibilities, risk, compliance, IT controls, or other Group procedures. Treat it as authoritative for company policy. Do not invent policy requirements. If the policy does not address a question, say so clearly and distinguish general professional guidance from Group policy.
 
-${COMPANY_POLICY}`,
+${COMPANY_POLICY}` : ""}`,
   }];
   if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
     conversationHistory.slice(-8).forEach(m => {
