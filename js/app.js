@@ -1,4 +1,4 @@
-// ── app.js — HexaFin.AI Main Application Controller ───────────────────
+// ── app.js — Guru Ji Main Application Controller ──────────────────────
 
 // ── AUTH ──────────────────────────────────────────────────────────────
 // Hardcoded admin. Extra users stored in localStorage under hx_users.
@@ -453,7 +453,7 @@ const APP = {
           <div class="msg-av ai-av">HF</div>
           <div class="msg-wrap">
             ${RENDERER.renderAIResponse(result)}
-            <div class="msg-meta">HexaFin.AI · ${this.currentOrg.name} · ${this.ts()}</div>
+            <div class="msg-meta">Guru Ji · ${this.currentOrg.name} · ${this.ts()}</div>
           </div>
         </div>`;
       this.messages.push({ role:"user", content:q });
@@ -469,7 +469,7 @@ const APP = {
               <strong>Error</strong><br>${this._escHtml(err.message)}<br>
               <small style="color:var(--muted)">Check the server connection or contact an administrator.</small>
             </div>
-            <div class="msg-meta">HexaFin.AI · ${this.ts()}</div>
+            <div class="msg-meta">Guru Ji · ${this.ts()}</div>
           </div>
         </div>`;
     }

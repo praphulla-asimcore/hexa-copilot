@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   HexaFin.AI — Design System v3 · "Refined Dark"
+  Guru Ji — Design System v3 · "Refined Dark"
    Deep neutral charcoal, soft borders, one violet accent, sharp type,
    minimal glow, fast/subtle motion.
    ═══════════════════════════════════════════════════════════════════ */
@@ -67,7 +67,7 @@
   --ease-out: cubic-bezier(.22, .61, .36, 1);
 
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-brand: 'Syne', var(--font);
+  --font-brand: var(--font);
   --font-num: 'Inter', ui-monospace, 'SF Mono', menlo, monospace;
 }
 
@@ -121,7 +121,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 /* Brand text (wordmark fallback) */
 .tb-name {
   font-family: var(--font-brand);
-  font-size: 14.5px; font-weight: 800; letter-spacing: -.2px;
+  font-size: 14.5px; font-weight: 650; letter-spacing: 0;
   color: var(--text);
 }
 
