@@ -9,7 +9,7 @@ const RENDERER = {
 
     if (result.accountingNote) {
       html += `<div class="src-tag" style="margin-top:10px;display:block;border-radius:6px;padding:8px 10px;line-height:1.5">
-        <strong style="color:#C084FC">📚 Accounting Note:</strong><br>${result.accountingNote}
+        <strong style="color:#C084FC">Accounting Note:</strong><br>${result.accountingNote}
       </div>`;
     }
 
@@ -24,7 +24,7 @@ const RENDERER = {
       });
     }
 
-    html += `<div class="src-tag">🔗 Live · Zoho Books · OpenAI GPT-4o</div>`;
+    html += `<div class="src-tag">Live · Zoho Books · OpenAI GPT-4o</div>`;
     html += `</div>`;
     return html;
   },
@@ -97,28 +97,34 @@ const RENDERER = {
         const invoices = data.invoices || [];
         if (!invoices.length) return `<div class="view-loading">No unpaid invoices found in Zoho Books.</div>`;
 
-        let arTotal = 0, overdueCount = 0, maxBal = 0;
+        // Use bcy_balance (base currency equivalent) for aggregate totals;
+        // individual rows show each transaction's own currency.
+        let arTotal = 0, overdueCount = 0, maxBal = 0, maxBalSym = sym;
         invoices.forEach(i => {
-          const bal = i.balance || 0;
-          arTotal += bal;
+          const bcyBal = i.bcy_balance ?? i.balance ?? 0;
+          arTotal += bcyBal;
           if (new Date(i.due_date) < today) overdueCount++;
-          if (bal > maxBal) maxBal = bal;
+          const bal = i.balance || 0;
+          if (bal > maxBal) { maxBal = bal; maxBalSym = i.currency_symbol || sym; }
         });
         const avgDso = this._avgDays(invoices, "due_date");
 
         const summary = [
-          { label: "Total AR",        value: this._fmt(arTotal, sym), sub: `${invoices.length} unpaid invoice${invoices.length !== 1 ? "s" : ""}`, cls: "gold"  },
+          { label: "Total AR",        value: this._fmt(arTotal, sym), sub: `${invoices.length} unpaid invoice${invoices.length !== 1 ? "s" : ""} · base ${cur}`, cls: "gold"  },
           { label: "Overdue",         value: overdueCount,            sub: "past due date",      cls: overdueCount ? "amber" : "pos" },
           { label: "Avg Days Due",    value: Math.max(avgDso, 0) + "d", sub: avgDso > 0 ? "past due" : "still pending", cls: avgDso > 30 ? "warn" : "" },
-          { label: "Largest Invoice", value: this._fmt(maxBal, sym),  sub: "single balance",     cls: "" },
+          { label: "Largest Invoice", value: this._fmt(maxBal, maxBalSym), sub: "single balance (transaction currency)", cls: "" },
         ];
 
         const rows = invoices.map(i => {
           const daysOverdue = this._daysOverdue(i.due_date);
+          const txSym = i.currency_symbol || sym;
+          const txCur = i.currency_code   || cur;
           return {
             "#":        i.invoice_number || "—",
             "Customer": i.customer_name  || "—",
-            "Amount":   this._fmt(i.balance || 0, sym),
+            "Currency": txCur,
+            "Amount":   this._fmt(i.balance || 0, txSym),
             "Issued":   i.date           || "—",
             "Due":      i.due_date       || "—",
             "Overdue":  daysOverdue > 0 ? daysOverdue + "d" : "—",
@@ -136,21 +142,24 @@ const RENDERER = {
 
         let apTotal = 0, overdueCount = 0;
         bills.forEach(b => {
-          apTotal += (b.balance || 0);
+          apTotal += (b.bcy_balance ?? b.balance ?? 0);
           if (new Date(b.due_date) < today) overdueCount++;
         });
 
         const summary = [
-          { label: "Total AP",   value: this._fmt(apTotal, sym), sub: `${bills.length} unpaid bill${bills.length !== 1 ? "s" : ""}`, cls: "amber" },
+          { label: "Total AP",   value: this._fmt(apTotal, sym), sub: `${bills.length} unpaid bill${bills.length !== 1 ? "s" : ""} · base ${cur}`, cls: "amber" },
           { label: "Overdue",    value: overdueCount,            sub: "past due date", cls: overdueCount ? "red" : "pos" },
         ];
 
         const rows = bills.map(b => {
           const daysOverdue = this._daysOverdue(b.due_date);
+          const txSym = b.currency_symbol || sym;
+          const txCur = b.currency_code   || cur;
           return {
             "Bill #":    b.bill_number || "—",
             "Vendor":    b.vendor_name || "—",
-            "Amount":    this._fmt(b.balance || 0, sym),
+            "Currency":  txCur,
+            "Amount":    this._fmt(b.balance || 0, txSym),
             "Bill Date": b.date        || "—",
             "Due":       b.due_date    || "—",
             "Overdue":   daysOverdue > 0 ? daysOverdue + "d" : "—",
@@ -163,28 +172,53 @@ const RENDERER = {
       }
 
       case "payments": {
-        const payments = data.customerpayments || [];
-        if (!payments.length) return `<div class="view-loading">No customer payments found in Zoho Books.</div>`;
+        const custPays = data.customerpayments || [];
+        const vendPays = data.vendorpayments   || [];
+        if (!custPays.length && !vendPays.length)
+          return `<div class="view-loading">No payments found in Zoho Books.</div>`;
 
-        let total = 0;
-        payments.forEach(p => total += (p.amount || 0));
+        let totalIn = 0, totalOut = 0;
+        custPays.forEach(p => totalIn  += (p.bcy_amount ?? p.amount ?? 0));
+        vendPays.forEach(p => totalOut += (p.bcy_amount ?? p.amount ?? 0));
 
         const summary = [
-          { label: "Total Received", value: this._fmt(total, sym), sub: `${payments.length} payment${payments.length !== 1 ? "s" : ""}`, cls: "green" },
+          { label: "Received (In)",  value: this._fmt(totalIn,  sym), sub: `${custPays.length} customer payment${custPays.length !== 1 ? "s" : ""} · base ${cur}`, cls: "green" },
+          { label: "Paid Out",       value: this._fmt(totalOut, sym), sub: `${vendPays.length} vendor payment${vendPays.length !== 1 ? "s" : ""} · base ${cur}`,   cls: "amber" },
         ];
 
-        const rows = payments.map(p => ({
-          "Ref":      p.payment_number || p.payment_id?.substring(0, 10) || "—",
-          "Customer": p.customer_name  || "—",
-          "Amount":   this._fmt(p.amount || 0, sym),
-          "Date":     p.date           || "—",
-          "Mode":     p.payment_mode   || "—",
-          "Unused":   p.unused_amount > 0 ? this._fmt(p.unused_amount, sym) : "—",
-          "Status":   "Cleared",
-        }));
+        const custRows = custPays.map(p => {
+          const txSym = p.currency_symbol || sym;
+          const txCur = p.currency_code   || cur;
+          return {
+            "Ref":      p.payment_number || p.payment_id?.substring(0, 10) || "—",
+            "Customer": p.customer_name  || "—",
+            "Currency": txCur,
+            "Amount":   this._fmt(p.amount || 0, txSym),
+            "Date":     p.date           || "—",
+            "Mode":     p.payment_mode   || "—",
+            "Unused":   p.unused_amount > 0 ? this._fmt(p.unused_amount, txSym) : "—",
+            "Status":   "Cleared",
+          };
+        });
+
+        const vendRows = vendPays.map(p => {
+          const txSym = p.currency_symbol || sym;
+          const txCur = p.currency_code   || cur;
+          return {
+            "Ref":        p.payment_number || p.payment_id?.substring(0, 10) || "—",
+            "Vendor":     p.vendor_name    || "—",
+            "Currency":   txCur,
+            "Amount":     this._fmt(p.amount || 0, txSym),
+            "Date":       p.date           || "—",
+            "Mode":       p.payment_mode   || "—",
+            "Paid Via":   p.paid_through_account_name || "—",
+            "Status":     "Cleared",
+          };
+        });
 
         return this.buildSummaryCards(summary) +
-               this.buildViewTable(`Customer Payments — ${org.name}`, cur, rows);
+               (custRows.length ? this.buildViewTable(`Customer Payments Received — ${org.name}`, cur, custRows) : "") +
+               (vendRows.length ? this.buildViewTable(`Vendor Payments Made — ${org.name}`, cur, vendRows) : "");
       }
 
       case "expenses": {
@@ -192,20 +226,25 @@ const RENDERER = {
         if (!expenses.length) return `<div class="view-loading">No expenses found in Zoho Books.</div>`;
 
         let total = 0;
-        expenses.forEach(e => total += (e.total || 0));
+        expenses.forEach(e => total += (e.bcy_total ?? e.total ?? 0));
 
         const summary = [
-          { label: "Total Expenses", value: this._fmt(total, sym), sub: `${expenses.length} expense${expenses.length !== 1 ? "s" : ""}`, cls: "" },
+          { label: "Total Expenses", value: this._fmt(total, sym), sub: `${expenses.length} expense${expenses.length !== 1 ? "s" : ""} · base ${cur}`, cls: "" },
         ];
 
-        const rows = expenses.map(e => ({
-          "Category": e.account_name              || "—",
-          "Vendor":   e.vendor_name               || e.paid_through_account_name || "—",
-          "Amount":   this._fmt(e.total || 0, sym),
-          "Date":     e.date                      || "—",
-          "Paid Via": e.paid_through_account_name || "—",
-          "Status":   e.is_billable               ? "Billable" : "Expensed",
-        }));
+        const rows = expenses.map(e => {
+          const txSym = e.currency_symbol || sym;
+          const txCur = e.currency_code   || cur;
+          return {
+            "Category": e.account_name              || "—",
+            "Vendor":   e.vendor_name               || e.paid_through_account_name || "—",
+            "Currency": txCur,
+            "Amount":   this._fmt(e.total || 0, txSym),
+            "Date":     e.date                      || "—",
+            "Paid Via": e.paid_through_account_name || "—",
+            "Status":   e.is_billable               ? "Billable" : "Expensed",
+          };
+        });
 
         return this.buildSummaryCards(summary) +
                this.buildViewTable(`Expenses — ${org.name}`, cur, rows);
@@ -296,18 +335,16 @@ const RENDERER = {
   // ── MODULE GRID (right sidebar) ───────────────────────────────────
   buildModGrid() {
     return [
-      { icon: "🧾", label: "Invoices",      prompt: "Show all outstanding invoices with aging and collection risk flags" },
-      { icon: "💳", label: "Payments",      prompt: "Summarize all customer payments received in the last 30 days" },
-      { icon: "📋", label: "Expenses",      prompt: "Expense breakdown by category this month with variance analysis" },
-      { icon: "📊", label: "P&L",           prompt: "P&L summary for the current financial year with margin analysis" },
-      { icon: "📑", label: "Balance Sheet", prompt: "Current Balance Sheet with key ratios and commentary" },
-      { icon: "⏱️", label: "AR Aging",      prompt: "AR aging analysis with 0-30, 30-60, 60-90, 90+ day buckets" },
-      { icon: "🏦", label: "Cash Flow",     prompt: "Current cash flow position, bank balances and free cash flow" },
-      { icon: "🔗", label: "Intercompany",  prompt: "Intercompany balances, FX translation and elimination entries" },
+      { label: "Invoices",      prompt: "Show all outstanding invoices with aging and collection risk flags" },
+      { label: "Payments",      prompt: "Summarize all customer payments received in the last 30 days" },
+      { label: "Expenses",      prompt: "Expense breakdown by category this month with variance analysis" },
+      { label: "P&L",           prompt: "P&L summary for the current financial year with margin analysis" },
+      { label: "Balance Sheet", prompt: "Current Balance Sheet with key ratios and commentary" },
+      { label: "AR Aging",      prompt: "AR aging analysis with 0-30, 30-60, 60-90, 90+ day buckets" },
+      { label: "Cash Flow",     prompt: "Current cash flow position, bank balances and free cash flow" },
+      { label: "Intercompany",  prompt: "Intercompany balances, FX translation and elimination entries" },
     ].map(m => `
-      <div class="mod-btn" onclick="APP.askQuick('${m.prompt}')">
-        <span class="mod-icon">${m.icon}</span>${m.label}
-      </div>`).join("");
+      <div class="mod-btn" onclick="APP.askQuick('${m.prompt}')">${m.label}</div>`).join("");
   },
 
   // ── HELPERS ───────────────────────────────────────────────────────
