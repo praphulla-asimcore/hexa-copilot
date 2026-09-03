@@ -398,7 +398,7 @@ async function fetchZohoContext(token, region, orgId, query) {
     tasks.push(() => zohoGetPaged(token,region,"purchaseorders",dpL,"purchaseorders").then(r=>({purchaseorders:r,_period:dr.label})));
 
   // ── EXPENSES ────────────────────────────────────────────────────────
-  if (/expense|cost|spend|overhead|reimburs/.test(q) && !isPnlExpenseQuery)
+  if (/expense|cost|spend|overhead|reimburs/.test(q) && !isPnlExpenseQuery && !isSalaryQuery)
     tasks.push(() => zohoGetPaged(token,region,"expenses",dpL,"expenses").then(r=>({expenses:r,_period:dr.label})));
 
   // ── RECURRING EXPENSES ───────────────────────────────────────────────
