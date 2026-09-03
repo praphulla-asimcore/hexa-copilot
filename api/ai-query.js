@@ -191,6 +191,25 @@ function buildPaymentLinks(data) {
   return links;
 }
 
+function buildDeterministicAging(data, asOfDate) {
+  const asOf = new Date(`${asOfDate}T23:59:59Z`).getTime();
+  const aging = {};
+  [["invoices", "receivables"], ["bills", "payables"]].forEach(([type, label]) => {
+    if (!Array.isArray(data[type])) return;
+    const buckets = { current: 0, one_to_thirty: 0, thirty_one_to_sixty: 0, sixty_one_to_ninety: 0, above_ninety: 0 };
+    data[type].forEach(record => {
+      const balance = Number(record.balance || 0);
+      const dueTime = new Date(`${record.due_date}T23:59:59Z`).getTime();
+      if (!Number.isFinite(balance) || !Number.isFinite(dueTime)) return;
+      const overdueDays = Math.max(0, Math.floor((asOf - dueTime) / 86400000));
+      const bucket = overdueDays <= 30 ? "current" : overdueDays <= 60 ? "one_to_thirty" : overdueDays <= 90 ? "thirty_one_to_sixty" : overdueDays <= 120 ? "sixty_one_to_ninety" : "above_ninety";
+      buckets[bucket] += balance;
+    });
+    aging[label] = buckets;
+  });
+  return aging;
+}
+
 function resolvePartyMatches(data, query) {
   const nameMatch = query.match(/\b(?:vendor|supplier|customer|client)\s+(?:named\s+)?["']?([A-Za-z][A-Za-z0-9 .&'-]{1,60}?)["']?(?:\s+(?:invoice|bill|payment|paid|balance|amount|date|list|details|status)|[?,.]|$)/i);
   if (!nameMatch) return [];
@@ -256,10 +275,10 @@ async function fetchZohoContext(token, region, orgId, query) {
   }
 
   if (/ar.?aging|aged.?receivable|receivable.?aging/.test(q))
-    tasks.push(() => zohoGet(token,region,"reports/agingsummary",{...rp,type:"receivable",date:dr.to}).then(d=>({ar_aging_report:d,_period:dr.label})));
+    tasks.push(() => zohoGet(token,region,"reports/agedreceivables",{...rp,date:dr.to,interval:30}).then(d=>({ar_aging_report:d,_period:dr.label})));
 
   if (/ap.?aging|aged.?payable|payable.?aging/.test(q))
-    tasks.push(() => zohoGet(token,region,"reports/agingsummary",{...rp,type:"payable",date:dr.to}).then(d=>({ap_aging_report:d,_period:dr.label})));
+    tasks.push(() => zohoGet(token,region,"reports/agedpayables",{...rp,date:dr.to,interval:30}).then(d=>({ap_aging_report:d,_period:dr.label})));
 
   if (/customer.?balance|client.?balance|receivable.?summ/.test(q))
     tasks.push(() => zohoGet(token,region,"reports/customerbalances",{...rp,as_of_date:dr.to}).then(d=>({customer_balances:d,_period:dr.label})));
@@ -415,6 +434,7 @@ async function fetchZohoContext(token, region, orgId, query) {
   debug.sourceRecords = buildSourceRecords(combined);
   debug.deterministicTotals = buildDeterministicTotals(combined);
   debug.paymentLinks = buildPaymentLinks(combined);
+  debug.deterministicAging = buildDeterministicAging(combined, dr.to);
   debug.partyMatches = resolvePartyMatches(combined, query);
 
   const json = JSON.stringify(combined, null, 2);

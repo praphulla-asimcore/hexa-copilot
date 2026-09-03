@@ -249,7 +249,9 @@ generalledger: { from_date, to_date, accounts[]: {account_name, account_code, op
 
 accounttransactions: { from_date, to_date, account_name, transactions[]: {date, transaction_type, reference_number, description, debit, credit, running_balance} }
 
-agingsummary (AR/AP): { as_of_date, contacts[]: {name, current, one_to_thirty, thirty_one_to_sixty, sixty_one_to_ninety, above_ninety, total} }
+agedreceivables: Zoho aged receivables report; use deterministicAging.receivables for bucket totals.
+
+agedpayables: Zoho aged payables report; use deterministicAging.payables for bucket totals.
 
 customerbalances: { contacts[]: {contact_name, outstanding_amount, unused_credits, balance} }
 
