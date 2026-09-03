@@ -671,7 +671,10 @@ table.vt { font-size: 12.5px; }
 .user-list-item:last-child { border-bottom: 0; }
 .user-list-name { color: var(--text); font-size: 12.5px; font-weight: 550; }
 .user-list-email { color: var(--muted); font-size: 11px; margin-top: 2px; }
+.user-list-actions { display: flex; align-items: center; gap: 10px; }
 .user-list-role { color: var(--accent); font-size: 10px; font-weight: 650; text-transform: uppercase; letter-spacing: .07em; }
+.user-resend-btn { background: transparent; border: 1px solid var(--border-2); border-radius: var(--r-xs); color: var(--text-s); cursor: pointer; font-size: 10px; padding: 4px 7px; }
+.user-resend-btn:hover { border-color: var(--accent-line); color: var(--text); }
 
 /* ── LOGIN PAGE ────────────────────────────────────────────────── */
 #loginPage {

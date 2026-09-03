@@ -49,8 +49,31 @@ function renderUserManager() {
   document.getElementById("userManagerList").innerHTML = users.map(user => `
     <div class="user-list-item">
       <div><div class="user-list-name">${APP._escHtml(user.name)}</div><div class="user-list-email">${APP._escHtml(user.email)}</div></div>
-      <div class="user-list-role">${APP._escHtml(user.role)}</div>
+      <div class="user-list-actions">
+        <div class="user-list-role">${APP._escHtml(user.role)}</div>
+        ${user.role !== "admin" ? `<button class="user-resend-btn" type="button" onclick="resendUserInvite('${encodeURIComponent(user.email)}')">Resend</button>` : ""}
+      </div>
     </div>`).join("");
+}
+
+async function resendUserInvite(encodedEmail) {
+  const session = getSession();
+  if (session?.role !== "admin") return;
+  const user = getUsers().find(item => item.email === decodeURIComponent(encodedEmail));
+  if (!user) return;
+  const error = document.getElementById("userManagerError");
+  error.textContent = `Sending invitation to ${user.email}…`;
+  try {
+    const response = await fetch("/api/user-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: user.name, email: user.email, password: user.password, role: user.role }),
+    });
+    const result = await response.json().catch(() => ({}));
+    error.textContent = response.ok ? "Invitation sent successfully." : (result.error || "Invitation could not be sent.");
+  } catch (_) {
+    error.textContent = "Could not reach the invitation service.";
+  }
 }
 
 async function addUser(event) {
