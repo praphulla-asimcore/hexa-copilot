@@ -69,12 +69,12 @@ function _postLogin(session) {
 async function _bootstrap() {
   try {
     const zohoOrgs = await GEMINI.fetchOrganizations();
-    if (!zohoOrgs.length) throw new Error("No Zoho Books organisations found for the connected account.");
+    if (!zohoOrgs.length) throw new Error("No organisations found for the connected account.");
     ORGS.length = 0;
     zohoOrgs.forEach(o => ORGS.push(buildOrgFromZoho(o)));
     _launchApp();
   } catch (err) {
-    _showNoConfig("Could not connect to Zoho Books: " + err.message);
+    _showNoConfig("Could not connect to the finance data service: " + err.message);
   }
 }
 
@@ -82,7 +82,7 @@ function _launchApp() {
   document.getElementById("app").classList.remove("hidden");
   document.querySelector(".live-dot").classList.add("online");
   document.getElementById("liveText").textContent =
-    `Live · ${ORGS.length} org${ORGS.length !== 1 ? "s" : ""} · OpenAI + Zoho Books`;
+    `Live · ${ORGS.length} org${ORGS.length !== 1 ? "s" : ""}`;
   APP.init();
 }
 
@@ -95,7 +95,7 @@ function _showNoConfig(msg) {
       <div class="empty-state-icon">HF</div>
       <div class="empty-state-title">Setup required</div>
       <div class="empty-state-copy">
-        ${msg || "The server is missing its OpenAI / Zoho Books credentials.<br>An administrator needs to set the OPENAI_API_KEY and ZOHO_* environment variables and redeploy."}
+        ${msg || "The server is missing its required credentials.<br>An administrator needs to configure the server environment and redeploy."}
       </div>
     </div>`;
   APP.initShell();
@@ -300,13 +300,13 @@ const APP = {
       body.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">HF</div>
-          <div class="empty-state-title">Connect Zoho Books</div>
+          <div class="empty-state-title">Connect finance data</div>
           <div class="empty-state-copy">Live module data will appear here after the server credentials are configured.</div>
         </div>`;
       return;
     }
 
-    body.innerHTML = `<div class="view-loading">Fetching live data from Zoho Books…</div>`;
+    body.innerHTML = `<div class="view-loading">Fetching live financial data…</div>`;
     if (sub) sub.textContent = `${org.name} · ${org.currency} · Live`;
 
     if (["reports","intercompany","tax"].includes(view)) {
@@ -320,7 +320,7 @@ const APP = {
           <div class="empty-state-icon">AI</div>
           <div class="empty-state-title">Ask AI for live analysis</div>
           <div class="empty-state-copy">
-            This module queries your live Zoho Books data via AI. Run it for a full analysis.
+            This module queries your live financial data via AI. Run it for a full analysis.
           </div>
           <button class="view-btn" onclick="APP.askQuick('${prompts[view]}')">
             Get live ${view.charAt(0).toUpperCase() + view.slice(1)} analysis

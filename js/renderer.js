@@ -24,7 +24,7 @@ const RENDERER = {
       });
     }
 
-    html += `<div class="src-tag">Live · Zoho Books · OpenAI GPT-4o</div>`;
+    html += `<div class="src-tag">Live financial data</div>`;
     html += `</div>`;
     return html;
   },
@@ -95,7 +95,7 @@ const RENDERER = {
 
       case "invoices": {
         const invoices = data.invoices || [];
-        if (!invoices.length) return `<div class="view-loading">No unpaid invoices found in Zoho Books.</div>`;
+        if (!invoices.length) return `<div class="view-loading">No unpaid invoices found.</div>`;
 
         // Use bcy_balance (base currency equivalent) for aggregate totals;
         // individual rows show each transaction's own currency.
@@ -138,7 +138,7 @@ const RENDERER = {
 
       case "ap": {
         const bills = data.bills || [];
-        if (!bills.length) return `<div class="view-loading">No unpaid bills found in Zoho Books.</div>`;
+        if (!bills.length) return `<div class="view-loading">No unpaid bills found.</div>`;
 
         let apTotal = 0, overdueCount = 0;
         bills.forEach(b => {
@@ -175,7 +175,7 @@ const RENDERER = {
         const custPays = data.customerpayments || [];
         const vendPays = data.vendorpayments   || [];
         if (!custPays.length && !vendPays.length)
-          return `<div class="view-loading">No payments found in Zoho Books.</div>`;
+          return `<div class="view-loading">No payments found.</div>`;
 
         let totalIn = 0, totalOut = 0;
         custPays.forEach(p => totalIn  += (p.bcy_amount ?? p.amount ?? 0));
@@ -223,7 +223,7 @@ const RENDERER = {
 
       case "expenses": {
         const expenses = data.expenses || [];
-        if (!expenses.length) return `<div class="view-loading">No expenses found in Zoho Books.</div>`;
+        if (!expenses.length) return `<div class="view-loading">No expenses found.</div>`;
 
         let total = 0;
         expenses.forEach(e => total += (e.bcy_total ?? e.total ?? 0));
@@ -251,7 +251,7 @@ const RENDERER = {
       }
 
       default:
-        return `<div class="view-loading">Ask the AI for live data from Zoho Books →</div>`;
+        return `<div class="view-loading">Ask Guru Ji for live financial data →</div>`;
     }
   },
 

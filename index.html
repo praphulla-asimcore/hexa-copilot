@@ -62,15 +62,6 @@
     </div>
 
     <div class="tb-right">
-      <div class="pill pill-gemini">
-        <span class="pill-dot blue"></span>
-        OpenAI GPT-4o
-      </div>
-      <div class="pill pill-zoho" id="zohoPill">
-        <span class="pill-dot orange"></span>
-        Zoho Books
-      </div>
-
       <div class="avatar-wrap" id="avatarWrap">
         <button class="user-avatar" id="userAvatar" type="button" aria-label="Open user menu" aria-controls="avatarMenu" aria-expanded="false" onclick="toggleAvatarMenu()">
           <span id="userInitials">—</span>
@@ -180,7 +171,7 @@
             <h1 class="welcome-title">Clarity across every entity.</h1>
             <div class="welcome-sub">
               Ask about invoices, AR/AP, expenses, payroll, tax, and financial reports for
-              <strong id="welcomeOrg">Hexamatics Group</strong> — answered with live Zoho Books data.
+              <strong id="welcomeOrg">Hexamatics Group</strong> — answered with live financial data.
             </div>
             <div class="quick-chips" id="quickChips"></div>
           </div>
@@ -206,7 +197,7 @@
               </svg>
             </button>
           </div>
-          <div class="input-hint">Guru Ji · OpenAI GPT-4o + Live Zoho Books · <span id="currentOrgLabel">—</span></div>
+          <div class="input-hint">Guru Ji · Live financial data · <span id="currentOrgLabel">—</span></div>
         </div>
       </div>
 
@@ -215,7 +206,7 @@
         <div class="view-header">
           <div>
             <div class="view-title">Invoices</div>
-            <div class="view-sub" id="invoices-sub">Live from Zoho Books</div>
+            <div class="view-sub" id="invoices-sub">Live financial data</div>
           </div>
           <button class="view-btn" onclick="APP.askQuick('Show detailed invoice analysis with aging and collection forecast')">Ask AI about Invoices</button>
         </div>
