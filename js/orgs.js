@@ -4,6 +4,18 @@
 
 let ORGS = [];
 
+const HIDDEN_ORGANIZATIONS = new Set([
+  "853265884", // Datacrats Sdn Bhd
+  "761483650", // Karya Indah
+  "759722348", // Hexamatics Bangladesh Ltd
+]);
+
+function isHiddenOrganization(apiOrg) {
+  if (HIDDEN_ORGANIZATIONS.has(String(apiOrg.organization_id))) return true;
+  const name = String(apiOrg.name || "").toLowerCase();
+  return name.includes("datacrats") || name.includes("karya indah") || name.includes("bangladesh");
+}
+
 // ── COUNTRY METADATA ──────────────────────────────────────────────────
 const COUNTRY_FLAGS = {
   SG: "🇸🇬", MY: "🇲🇾", ID: "🇮🇩", PH: "🇵🇭", NP: "🇳🇵",

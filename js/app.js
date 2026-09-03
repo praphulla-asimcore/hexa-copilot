@@ -177,7 +177,7 @@ async function _bootstrap() {
     const zohoOrgs = await GEMINI.fetchOrganizations();
     if (!zohoOrgs.length) throw new Error("No organisations found for the connected account.");
     ORGS.length = 0;
-    zohoOrgs.forEach(o => ORGS.push(buildOrgFromZoho(o)));
+    zohoOrgs.filter(o => !isHiddenOrganization(o)).forEach(o => ORGS.push(buildOrgFromZoho(o)));
     _launchApp();
   } catch (err) {
     _showNoConfig("Could not connect to the finance data service: " + err.message);
