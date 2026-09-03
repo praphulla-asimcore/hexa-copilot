@@ -214,7 +214,7 @@ function buildPnlFacts(report) {
   if (!report || typeof report !== "object") return null;
   const facts = { income: [], costOfGoodsSold: [], operatingExpenses: [], otherIncome: [], otherExpenses: [], totals: {} };
   const addAccounts = (target, value) => {
-    const accounts = Array.isArray(value) ? value : value?.accounts;
+    const accounts = Array.isArray(value) ? value : (value?.accounts || value?.account_transactions);
     if (!Array.isArray(accounts)) return;
     accounts.forEach(account => {
       const name = account.name || account.account_name || account.accountName;
