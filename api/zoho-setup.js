@@ -48,7 +48,8 @@ module.exports = async function handler(req, res) {
   const redirectUri = `${proto}://${host}/api/zoho-setup`;
 
   const q      = req.query || {};
-  const secret = q.secret || "";
+  // On the redirect back from Zoho the guard value arrives as ?state=, not ?secret=.
+  const secret = q.secret || q.state || "";
   const code   = q.code || "";
 
   // ── Guards ──────────────────────────────────────────────────────────
