@@ -1,10 +1,23 @@
-// Vercel serverless function — fetches Zoho context + calls OpenAI server-side.
+// Vercel serverless function — fetches finance context + calls the AI server-side.
 // Covers every Zoho Books API v3 endpoint. maxDuration set after module.exports.
 //
 // Credentials come from environment variables (OPENAI_API_KEY + the ZOHO_*
 // vars consumed by ./_zoho-auth.js); the browser never sends a key or token.
 
 const { zohoBooksGet, isConfigured: zohoConfigured } = require("./_zoho-auth.js");
+const fs = require("fs");
+const path = require("path");
+
+function loadCompanyPolicy() {
+  try {
+    return fs.readFileSync(path.join(__dirname, "..", "knowledge", "company-policy.md"), "utf8");
+  } catch (e) {
+    console.error("Company policy file unavailable:", e.message);
+    return "Company policy knowledge is currently unavailable.";
+  }
+}
+
+const COMPANY_POLICY = loadCompanyPolicy();
 
 // ── DATE RANGE PARSER ─────────────────────────────────────────────────
 function parseDateRange(query, wideSearch = false) {
@@ -302,7 +315,15 @@ module.exports = async function handler(req, res) {
       ].join("\n")
     : "(Zoho data unavailable.)";
 
-  const messages = [{ role:"system", content:systemPrompt }];
+  const messages = [{
+    role:"system",
+    content: `${systemPrompt}
+
+COMPANY POLICY KNOWLEDGE BASE:
+Use the following approved company policy when answering questions about internal rules, approvals, responsibilities, risk, compliance, IT controls, or other Group procedures. Treat it as authoritative for company policy. Do not invent policy requirements. If the policy does not address a question, say so clearly and distinguish general professional guidance from Group policy.
+
+${COMPANY_POLICY}`,
+  }];
   if (Array.isArray(conversationHistory) && conversationHistory.length > 0) {
     conversationHistory.slice(-8).forEach(m => {
       if (m.role === "user") messages.push({ role:"user",      content:m.content });
