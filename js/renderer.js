@@ -9,7 +9,7 @@ const RENDERER = {
 
     if (result.accountingNote) {
       html += `<div class="src-tag" style="margin-top:10px;display:block;border-radius:6px;padding:8px 10px;line-height:1.5">
-        <strong style="color:#C084FC">Accounting Note:</strong><br>${result.accountingNote}
+        <strong style="color:var(--purple-l)">Accounting Note:</strong><br>${result.accountingNote}
       </div>`;
     }
 
@@ -344,7 +344,7 @@ const RENDERER = {
       { label: "Cash Flow",     prompt: "Current cash flow position, bank balances and free cash flow" },
       { label: "Intercompany",  prompt: "Intercompany balances, FX translation and elimination entries" },
     ].map(m => `
-      <div class="mod-btn" onclick="APP.askQuick('${m.prompt}')">${m.label}</div>`).join("");
+      <button type="button" class="mod-btn" onclick="APP.askQuick('${m.prompt}')">${m.label}</button>`).join("");
   },
 
   // ── HELPERS ───────────────────────────────────────────────────────

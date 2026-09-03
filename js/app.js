@@ -31,8 +31,6 @@ function clearSession() { localStorage.removeItem("hx_session"); }
 // Credentials (OpenAI + Zoho) live server-side in environment variables.
 // The client only gates access with a login and then boots the app.
 document.addEventListener("DOMContentLoaded", () => {
-  _startParticles();
-
   const session = getSession();
   if (session) _postLogin(session);
   // Otherwise loginPage stays visible (default)
@@ -93,11 +91,10 @@ function _showNoConfig(msg) {
   document.getElementById("liveText").textContent = "Not connected";
   // Show a message in the chat area
   document.getElementById("welcome").innerHTML = `
-    <div style="text-align:center;padding:60px 20px">
-      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--text);margin-bottom:10px">
-        Setup Required
-      </div>
-      <div style="font-size:13px;color:var(--muted);line-height:1.8;max-width:420px;margin:0 auto">
+    <div class="empty-state setup-state">
+      <div class="empty-state-icon">HF</div>
+      <div class="empty-state-title">Setup required</div>
+      <div class="empty-state-copy">
         ${msg || "The server is missing its OpenAI / Zoho Books credentials.<br>An administrator needs to set the OPENAI_API_KEY and ZOHO_* environment variables and redeploy."}
       </div>
     </div>`;
@@ -123,6 +120,26 @@ function doLogout() {
 function toggleAvatarMenu() {
   const menu = document.getElementById("avatarMenu");
   menu.classList.toggle("hidden");
+  document.getElementById("userAvatar")?.setAttribute("aria-expanded", String(!menu.classList.contains("hidden")));
+}
+
+function toggleMobileNav() {
+  const side = document.getElementById("sideL");
+  const overlay = document.getElementById("mobileOverlay");
+  const open = !side.classList.contains("mobile-open");
+  side.classList.toggle("mobile-open", open);
+  overlay.classList.toggle("visible", open);
+  const button = document.getElementById("mobileMenuBtn");
+  button?.setAttribute("aria-expanded", String(open));
+  button?.setAttribute("aria-label", open ? "Close navigation" : "Open navigation");
+}
+
+function closeMobileNav() {
+  document.getElementById("sideL")?.classList.remove("mobile-open");
+  document.getElementById("mobileOverlay")?.classList.remove("visible");
+  const button = document.getElementById("mobileMenuBtn");
+  button?.setAttribute("aria-expanded", "false");
+  button?.setAttribute("aria-label", "Open navigation");
 }
 
 // Close dropdown when clicking outside
@@ -130,6 +147,15 @@ document.addEventListener("click", e => {
   const wrap = document.getElementById("avatarWrap");
   if (wrap && !wrap.contains(e.target)) {
     document.getElementById("avatarMenu")?.classList.add("hidden");
+    document.getElementById("userAvatar")?.setAttribute("aria-expanded", "false");
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    closeMobileNav();
+    document.getElementById("avatarMenu")?.classList.add("hidden");
+    document.getElementById("userAvatar")?.setAttribute("aria-expanded", "false");
   }
 });
 
@@ -198,8 +224,9 @@ const APP = {
     badgeAp.textContent  = ""; badgeAp.classList.add("hidden");
 
     document.getElementById("statCards").innerHTML    = RENDERER.buildStatCards(org);
+    this._animateStats();
     document.getElementById("activityFeed").innerHTML =
-      `<div class="act-item"><div class="act-dot" style="background:#60A5FA"></div>
+      `<div class="act-item"><div class="act-dot" style="background:var(--blue-l)"></div>
        <div><div class="act-text">Fetching live data…</div></div></div>`;
 
     this._refreshSnapshot(org);
@@ -228,14 +255,15 @@ const APP = {
 
       if (this.currentOrg.id === org.id) {
         document.getElementById("statCards").innerHTML = RENDERER.buildStatCards(org);
+        this._animateStats();
 
         const t = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
         document.getElementById("activityFeed").innerHTML = [
-          snap.arOverdue ? `<div class="act-item"><div class="act-dot" style="background:#F87171"></div><div><div class="act-text">${snap.arOverdue} invoice${snap.arOverdue > 1 ? "s" : ""} overdue</div><div class="act-time">AR · ${org.currency}</div></div></div>` : "",
-          snap.apOverdue ? `<div class="act-item"><div class="act-dot" style="background:#FBBF24"></div><div><div class="act-text">${snap.apOverdue} vendor bill${snap.apOverdue > 1 ? "s" : ""} overdue</div><div class="act-time">AP · ${org.currency}</div></div></div>` : "",
-          `<div class="act-item"><div class="act-dot" style="background:#4ADE80"></div><div><div class="act-text">Snapshot refreshed</div><div class="act-time">Live · ${t}</div></div></div>`,
+          snap.arOverdue ? `<div class="act-item"><div class="act-dot" style="background:var(--red)"></div><div><div class="act-text">${snap.arOverdue} invoice${snap.arOverdue > 1 ? "s" : ""} overdue</div><div class="act-time">AR · ${org.currency}</div></div></div>` : "",
+          snap.apOverdue ? `<div class="act-item"><div class="act-dot" style="background:var(--amber)"></div><div><div class="act-text">${snap.apOverdue} vendor bill${snap.apOverdue > 1 ? "s" : ""} overdue</div><div class="act-time">AP · ${org.currency}</div></div></div>` : "",
+          `<div class="act-item"><div class="act-dot" style="background:var(--green)"></div><div><div class="act-text">Snapshot refreshed</div><div class="act-time">Live · ${t}</div></div></div>`,
         ].filter(Boolean).join("") ||
-          `<div class="act-item"><div class="act-dot" style="background:#4ADE80"></div><div><div class="act-text">All clear</div><div class="act-time">No overdue items</div></div></div>`;
+          `<div class="act-item"><div class="act-dot" style="background:var(--green)"></div><div><div class="act-text">All clear</div><div class="act-time">No overdue items</div></div></div>`;
 
         if (snap.arCount > 0) _badgeSet("badge-invoices", snap.arCount, false);
         if (snap.apOverdue > 0) _badgeSet("badge-ap", snap.apOverdue, true);
@@ -244,14 +272,15 @@ const APP = {
       console.error("Snapshot error:", err);
       if (this.currentOrg.id === org.id) {
         document.getElementById("activityFeed").innerHTML =
-          `<div class="act-item"><div class="act-dot" style="background:#F87171"></div>
-           <div><div class="act-text" style="color:#F87171">⚠ ${err.message}</div></div></div>`;
+          `<div class="act-item"><div class="act-dot" style="background:var(--red)"></div>
+           <div><div class="act-text" style="color:var(--red)">⚠ ${err.message}</div></div></div>`;
       }
     }
   },
 
   // ── NAVIGATION ──────────────────────────────────────────────────────
   switchView(view, el) {
+    closeMobileNav();
     this.currentView = view;
     document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
     if (el) el.classList.add("active");
@@ -267,6 +296,16 @@ const APP = {
     const sub  = document.getElementById(`${view}-sub`);
     if (!body) return;
 
+    if (!org) {
+      body.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">HF</div>
+          <div class="empty-state-title">Connect Zoho Books</div>
+          <div class="empty-state-copy">Live module data will appear here after the server credentials are configured.</div>
+        </div>`;
+      return;
+    }
+
     body.innerHTML = `<div class="view-loading">Fetching live data from Zoho Books…</div>`;
     if (sub) sub.textContent = `${org.name} · ${org.currency} · Live`;
 
@@ -277,13 +316,14 @@ const APP = {
         tax:          "What are outstanding tax liabilities, upcoming filing deadlines and tax provisions?",
       };
       body.innerHTML = `
-        <div style="text-align:center;padding:40px 20px">
-          <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">Ask AI for Live Analysis</div>
-          <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.7">
-            This module queries your live Zoho Books data via AI.<br>Click below to get a full live analysis.
+        <div class="empty-state">
+          <div class="empty-state-icon">AI</div>
+          <div class="empty-state-title">Ask AI for live analysis</div>
+          <div class="empty-state-copy">
+            This module queries your live Zoho Books data via AI. Run it for a full analysis.
           </div>
           <button class="view-btn" onclick="APP.askQuick('${prompts[view]}')">
-            Get Live ${view.charAt(0).toUpperCase() + view.slice(1)} Analysis
+            Get live ${view.charAt(0).toUpperCase() + view.slice(1)} analysis
           </button>
         </div>`;
       return;
@@ -296,7 +336,7 @@ const APP = {
       body.innerHTML = `
         <div class="view-loading" style="color:var(--red)">
           ${err.message}<br>
-          <small style="color:var(--muted);display:block;margin-top:6px">Check your Zoho token in Settings (admin).</small>
+          <small style="color:var(--muted);display:block;margin-top:6px">Check the server connection or contact an administrator.</small>
         </div>`;
     }
   },
@@ -311,19 +351,43 @@ const APP = {
 
   buildQuickChips() {
     document.getElementById("quickChips").innerHTML = QUICK_PROMPTS.map(q =>
-      `<div class="chip" onclick="APP.askQuick('${q.prompt.replace(/'/g,"\\'")}')">${q.label}</div>`
+      `<button type="button" class="chip" onclick="APP.askQuick('${q.prompt.replace(/'/g,"\\'")}')">${q.label}</button>`
     ).join("");
   },
 
   buildChatHistory() {
     document.getElementById("chatHistory").innerHTML = this.historyItems.map((h, i) =>
-      `<div class="hist-item ${i===0?"recent":""}" onclick="APP.askQuick('${h.prompt.replace(/'/g,"\\'")}')">
-        ${h.label}</div>`
+      `<button type="button" class="hist-item ${i===0?"recent":""}" onclick="APP.askQuick('${h.prompt.replace(/'/g,"\\'")}')">
+        ${h.label}</button>`
     ).join("");
   },
 
   buildModGrid() {
     document.getElementById("modGrid").innerHTML = RENDERER.buildModGrid();
+  },
+
+  // Count-up on the right-sidebar stat values. Parses "RM 1.2M" / "RM 2,345.00"
+  // into prefix + number + suffix and eases from 0 to the target (~480ms).
+  _animateStats() {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    document.querySelectorAll("#statCards .stat-val").forEach(el => {
+      const raw = el.textContent.trim();
+      const m = raw.match(/^(\D*?)([\d,]+(?:\.\d+)?)(\D*)$/);
+      if (!m) return;
+      const [, pre, numStr, suf] = m;
+      const target = parseFloat(numStr.replace(/,/g, ""));
+      if (!isFinite(target)) return;
+      const decimals = (numStr.split(".")[1] || "").length;
+      const dur = 480, t0 = performance.now();
+      const step = now => {
+        const p = Math.min((now - t0) / dur, 1);
+        const v = target * (1 - Math.pow(1 - p, 3));
+        el.textContent = pre + v.toLocaleString("en", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suf;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      el.textContent = pre + (0).toLocaleString("en", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suf;
+      requestAnimationFrame(step);
+    });
   },
 
   askQuick(prompt) {
@@ -403,7 +467,7 @@ const APP = {
           <div class="msg-wrap">
             <div class="bubble ai-bubble">
               <strong>Error</strong><br>${this._escHtml(err.message)}<br>
-              <small style="color:var(--muted)">Check API keys in Settings or contact admin.</small>
+              <small style="color:var(--muted)">Check the server connection or contact an administrator.</small>
             </div>
             <div class="msg-meta">HexaFin.AI · ${this.ts()}</div>
           </div>
@@ -426,36 +490,4 @@ function _badgeSet(id, count, red) {
   el.textContent = count;
   el.classList.remove("hidden");
   if (red) el.className = "nav-badge red";
-}
-
-// ── PARTICLES ─────────────────────────────────────────────────────────
-function _startParticles() {
-  const canvas = document.getElementById("bg-particles");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const parts = [];
-  const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-  resize();
-  window.addEventListener("resize", resize);
-  for (let i = 0; i < 40; i++) {
-    parts.push({
-      x: Math.random() * window.innerWidth,  y: Math.random() * window.innerHeight,
-      r: Math.random() * 1.5 + 0.5,
-      dx: (Math.random()-.5)*.3, dy: (Math.random()-.5)*.3,
-      o: Math.random()*.4+.1,
-      c: Math.random()>.5 ? "#FF2D8B" : "#2B5FF5",
-    });
-  }
-  const draw = () => {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    parts.forEach(p => {
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-      ctx.fillStyle=p.c; ctx.globalAlpha=p.o; ctx.fill();
-      p.x+=p.dx; p.y+=p.dy;
-      if(p.x<0||p.x>canvas.width)  p.dx*=-1;
-      if(p.y<0||p.y>canvas.height) p.dy*=-1;
-    });
-    requestAnimationFrame(draw);
-  };
-  draw();
 }

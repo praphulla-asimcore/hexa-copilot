@@ -5,34 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HexaFin.AI — Finance Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div id="bg-hex"></div>
-<div id="bg-glow"></div>
-<canvas id="bg-particles"></canvas>
 
 <!-- ── LOGIN PAGE ─────────────────────────────────────────────── -->
 <div id="loginPage">
   <div class="login-card">
     <div class="login-logo-wrap">
-      <img src="assets/hexa-logo.png" alt="HexaFin.AI" class="login-logo-img">
+      <img src="assets/hexa-logo.svg" alt="HexaFin.AI" class="login-logo-img">
     </div>
     <div class="login-sub">Finance Intelligence Platform</div>
 
-    <div class="form-group" style="margin-top:28px;text-align:left">
-      <label>Email Address</label>
+    <div class="form-group login-first-field">
+      <label for="loginEmail">Email Address</label>
       <input type="email" id="loginEmail" placeholder="name@hexamatics.com" autocomplete="username">
     </div>
-    <div class="form-group" style="text-align:left">
-      <label>Password</label>
+    <div class="form-group">
+      <label for="loginPwd">Password</label>
       <input type="password" id="loginPwd" placeholder="••••••••" autocomplete="current-password"
         onkeydown="if(event.key==='Enter') doLogin()">
     </div>
-    <div id="loginError" class="login-error"></div>
-    <button class="btn-connect" id="loginBtn" onclick="doLogin()" style="width:100%;margin-top:4px">
+    <div id="loginError" class="login-error" role="alert" aria-live="polite"></div>
+    <button class="btn-connect login-submit" id="loginBtn" type="button" onclick="doLogin()">
       Sign In
     </button>
     <div class="login-footer">Hexamatics Group · Private &amp; Confidential</div>
@@ -45,7 +44,10 @@
   <!-- TOPBAR -->
   <header id="topbar">
     <div class="tb-left">
-      <img src="assets/hexa-logo.png" alt="Hexa" class="tb-logo-img">
+      <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation" aria-controls="sideL" aria-expanded="false" onclick="toggleMobileNav()">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <img src="assets/hexa-logo.svg" alt="Hexa" class="tb-logo-img">
       <div class="tb-brand-text">
         <span class="tb-name">HexaFin.AI</span>
         <span class="tb-tag">Finance Intelligence</span>
@@ -53,7 +55,7 @@
     </div>
 
     <div class="tb-center">
-      <div class="live-indicator">
+      <div class="live-indicator" aria-live="polite">
         <span class="live-dot" id="liveDot"></span>
         <span id="liveText">Connecting…</span>
       </div>
@@ -70,19 +72,21 @@
       </div>
 
       <div class="avatar-wrap" id="avatarWrap">
-        <div class="user-avatar" id="userAvatar" onclick="toggleAvatarMenu()">
+        <button class="user-avatar" id="userAvatar" type="button" aria-label="Open user menu" aria-controls="avatarMenu" aria-expanded="false" onclick="toggleAvatarMenu()">
           <span id="userInitials">—</span>
           <span class="avatar-status"></span>
-        </div>
+        </button>
         <div class="avatar-menu hidden" id="avatarMenu">
           <div class="avatar-menu-name" id="avatarMenuName">User</div>
           <div class="avatar-menu-role" id="avatarMenuRole">Member</div>
           <div class="avatar-menu-sep"></div>
-          <div class="avatar-menu-item danger" onclick="doLogout()">Sign Out</div>
+          <button class="avatar-menu-item danger" type="button" onclick="doLogout()">Sign Out</button>
         </div>
       </div>
     </div>
   </header>
+
+  <button id="mobileOverlay" type="button" aria-label="Close navigation" onclick="closeMobileNav()"></button>
 
   <!-- BODY -->
   <div class="app-body">
@@ -92,7 +96,6 @@
       <div class="sl-section-label">Active Organisation</div>
       <div class="org-select-wrap">
         <select id="orgSelect" onchange="APP.switchOrg(this.value)"></select>
-        <span class="select-arrow">▾</span>
       </div>
 
       <div class="org-card" id="orgCard">
@@ -105,56 +108,56 @@
 
       <div class="sl-section-label">Navigation</div>
       <nav id="mainNav">
-        <div class="nav-item active" data-view="chat" onclick="APP.switchView('chat', this)">
+        <button type="button" class="nav-item active" data-view="chat" onclick="APP.switchView('chat', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </span>
           AI Chat
-        </div>
-        <div class="nav-item" data-view="invoices" onclick="APP.switchView('invoices', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="invoices" onclick="APP.switchView('invoices', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           </span>
           Invoices
           <span class="nav-badge hidden" id="badge-invoices"></span>
-        </div>
-        <div class="nav-item" data-view="payments" onclick="APP.switchView('payments', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="payments" onclick="APP.switchView('payments', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
           </span>
           Payments
-        </div>
-        <div class="nav-item" data-view="expenses" onclick="APP.switchView('expenses', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="expenses" onclick="APP.switchView('expenses', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           </span>
           Expenses
-        </div>
-        <div class="nav-item" data-view="ap" onclick="APP.switchView('ap', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="ap" onclick="APP.switchView('ap', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
           </span>
           AP / Bills
           <span class="nav-badge red hidden" id="badge-ap"></span>
-        </div>
-        <div class="nav-item" data-view="reports" onclick="APP.switchView('reports', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="reports" onclick="APP.switchView('reports', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </span>
           Reports
-        </div>
-        <div class="nav-item" data-view="intercompany" onclick="APP.switchView('intercompany', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="intercompany" onclick="APP.switchView('intercompany', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
           </span>
           Intercompany
-        </div>
-        <div class="nav-item" data-view="tax" onclick="APP.switchView('tax', this)">
+        </button>
+        <button type="button" class="nav-item" data-view="tax" onclick="APP.switchView('tax', this)">
           <span class="nav-icon">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </span>
           Tax &amp; Compliance
-        </div>
+        </button>
       </nav>
 
       <div class="side-divider"></div>
@@ -171,11 +174,13 @@
         <div id="chatArea">
           <div id="welcome">
             <div class="welcome-logo-wrap">
-              <img src="assets/hexa-logo.png" alt="HexaFin.AI" class="welcome-logo">
+              <img src="assets/hexa-logo.svg" alt="HexaFin.AI" class="welcome-logo">
             </div>
+            <div class="welcome-kicker"><span></span>Connected finance intelligence</div>
+            <h1 class="welcome-title">Clarity across every entity.</h1>
             <div class="welcome-sub">
-              AI-powered Finance Intelligence for <strong id="welcomeOrg">Hexamatics Group</strong>.
-              Ask anything about invoices, AR/AP, expenses, payroll, tax, and financial reports — answered live from Zoho Books.
+              Ask about invoices, AR/AP, expenses, payroll, tax, and financial reports for
+              <strong id="welcomeOrg">Hexamatics Group</strong> — answered with live Zoho Books data.
             </div>
             <div class="quick-chips" id="quickChips"></div>
           </div>
@@ -195,7 +200,7 @@
               placeholder="Ask about invoices, AR/AP, payments, expenses, tax, reports…"
               onkeydown="APP.handleKey(event)"
               oninput="APP.autoResize(this)"></textarea>
-            <button class="send-btn" id="sendBtn" onclick="APP.sendMessage()" disabled>
+            <button class="send-btn" id="sendBtn" type="button" aria-label="Send message" onclick="APP.sendMessage()" disabled>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
               </svg>
